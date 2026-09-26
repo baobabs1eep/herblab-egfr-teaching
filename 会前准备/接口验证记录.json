@@ -1,0 +1,51 @@
+[
+  {
+    "name": "pubchem",
+    "url": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/quercetin/property/MolecularFormula,MolecularWeight,InChIKey/JSON",
+    "status": 200,
+    "result": {
+      "PropertyTable": {
+        "Properties": [
+          {
+            "CID": 5280343,
+            "MolecularFormula": "C15H10O7",
+            "MolecularWeight": "302.23",
+            "InChIKey": "REFJWTPEDVJJIY-UHFFFAOYSA-N"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "pubmed",
+    "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=quercetin%20AND%20EGFR&retmode=json&retmax=3",
+    "status": 200,
+    "result": {
+      "header": {
+        "type": "esearch",
+        "version": "0.3"
+      },
+      "esearchresult": {
+        "count": "449",
+        "retmax": "3",
+        "retstart": "0",
+        "idlist": [
+          "42761119",
+          "42747859",
+          "42736283"
+        ],
+        "translationset": [
+          {
+            "from": "quercetin",
+            "to": "\"quercetin\"[Supplementary Concept] OR \"quercetin\"[All Fields] OR \"quercetin\"[MeSH Terms] OR \"quercetin's\"[All Fields] OR \"quercetine\"[All Fields] OR \"quercetins\"[All Fields]"
+          },
+          {
+            "from": "EGFR",
+            "to": "\"erbb receptors\"[Supplementary Concept] OR \"erbb receptors\"[All Fields] OR \"egfr\"[All Fields] OR \"egfr protein, human\"[Supplementary Concept] OR \"egfr protein, human\"[All Fields] OR \"erbb receptors\"[MeSH Terms] OR (\"erbb\"[All Fields] AND \"receptors\"[All Fields])"
+          }
+        ],
+        "querytranslation": "(\"quercetin\"[Supplementary Concept] OR \"quercetin\"[All Fields] OR \"quercetin\"[MeSH Terms] OR \"quercetin s\"[All Fields] OR \"quercetine\"[All Fields] OR \"quercetins\"[All Fields]) AND (\"erbb receptors\"[Supplementary Concept] OR \"erbb receptors\"[All Fields] OR \"egfr\"[All Fields] OR \"egfr protein human\"[Supplementary Concept] OR \"egfr protein human\"[All Fields] OR \"erbb receptors\"[MeSH Terms] OR (\"erbb\"[All Fields] AND \"receptors\"[All Fields]))"
+      }
+    }
+  }
+]

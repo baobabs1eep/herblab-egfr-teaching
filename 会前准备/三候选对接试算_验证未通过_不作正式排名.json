@@ -1,0 +1,148 @@
+{
+  "metadata": {
+    "version": "egfr-wt-1m17-docking-exploratory-2026-09-27-v1",
+    "target": "EGFR WT, PDB 1M17 chain A",
+    "protocol": "1M17-WT-Vina-1.2.7-ex16-seed20260926-v1",
+    "filterPolicy": null,
+    "heatDefinition": "PubMed: 英文分子名[Title/Abstract] AND (EGFR[Title/Abstract] OR \"epidermal growth factor receptor\"[Title/Abstract]) AND 1940:2026/09/26[Date - Publication]; 未纳入同义词",
+    "heatDate": "2026-09-26",
+    "source": "会前准备/肺癌EGFR教学候选_首批核验.csv",
+    "description": "探索性教学试算：3 个候选已按统一协议对接，但共晶 AQ4 首位姿势回对接 RMSD 5.976 Å，不满足预设 <2 Å 自检；不应视为经验证的结合能力或正式双排名。硬过滤亦未确认。",
+    "dockingValidation": {
+      "status": "failed",
+      "nativeLigand": "AQ4 (erlotinib)",
+      "topPoseRmsdAngstrom": 5.976,
+      "thresholdAngstrom": 2,
+      "secondaryCheck": "4I22 IRE top pose RMSD 3.629 Å, also failed",
+      "details": "对接复现/prepared/results.json; 对接复现/prepared_4I22/validation.json"
+    }
+  },
+  "candidates": [
+    {
+      "id": "C001",
+      "name": "槲皮素",
+      "cid": 5280343,
+      "identity": {
+        "status": "verified",
+        "source": "https://pubchem.ncbi.nlm.nih.gov/compound/5280343"
+      },
+      "evidence": "PMID 34572484：EGFR C797S 耐药模型；摘要提出 AXL 相关机制，非直接 EGFR 靶向确证。",
+      "filter": {
+        "status": "unknown",
+        "policy": null,
+        "source": null,
+        "reason": "已获得 SwissADME 预测，但综合硬过滤规则未确定；对接协议共晶回放自检亦未通过，故不得作为正式排名候选。"
+      },
+      "docking": {
+        "score": -8.434,
+        "target": "EGFR WT, PDB 1M17 chain A",
+        "protocol": "1M17-WT-Vina-1.2.7-ex16-seed20260926-v1",
+        "source": "对接复现/prepared/C001.log",
+        "validation": "failed",
+        "pose": "对接复现/prepared/C001-out.pdbqt"
+      },
+      "heat": {
+        "count": 453,
+        "query": "quercetin[Title/Abstract] AND (EGFR[Title/Abstract] OR \"epidermal growth factor receptor\"[Title/Abstract]) AND 1940:2026/09/26[Date - Publication]",
+        "source": "https://pubmed.ncbi.nlm.nih.gov/?term=quercetin%5BTitle%2FAbstract%5D+AND+%28EGFR%5BTitle%2FAbstract%5D+OR+%22epidermal+growth+factor+receptor%22%5BTitle%2FAbstract%5D%29+AND+1940%3A2026%2F09%2F26%5BDate+-+Publication%5D",
+        "date": "2026-09-26"
+      },
+      "risk": "SwissADME 提示 catechol_A PAINS 结构警示和 CYP1A2/2D6/3A4 抑制预测；待核验。",
+      "adme_prediction": {
+        "source": "https://www.swissadme.ch/results/965266841/swissadme.csv",
+        "query_date": "2026-09-26",
+        "GI_absorption": "High",
+        "BBB_permeant": "No",
+        "Lipinski": "Yes; 0 violation",
+        "PAINS": "1 alert: catechol_A",
+        "CYP1A2_inhibitor": "Yes",
+        "CYP2D6_inhibitor": "Yes",
+        "CYP3A4_inhibitor": "Yes"
+      }
+    },
+    {
+      "id": "C002",
+      "name": "木犀草素",
+      "cid": 5280445,
+      "identity": {
+        "status": "verified",
+        "source": "https://pubchem.ncbi.nlm.nih.gov/compound/5280445"
+      },
+      "evidence": "PMID 24471765：EGFR L858R/T790M 模型；突变 EGFR 降解及 Hsp90 相互作用。",
+      "filter": {
+        "status": "unknown",
+        "policy": null,
+        "source": null,
+        "reason": "已获得 SwissADME 预测，但综合硬过滤规则未确定；对接协议共晶回放自检亦未通过，故不得作为正式排名候选。"
+      },
+      "docking": {
+        "score": -8.396,
+        "target": "EGFR WT, PDB 1M17 chain A",
+        "protocol": "1M17-WT-Vina-1.2.7-ex16-seed20260926-v1",
+        "source": "对接复现/prepared/C002.log",
+        "validation": "failed",
+        "pose": "对接复现/prepared/C002-out.pdbqt"
+      },
+      "heat": {
+        "count": 214,
+        "query": "luteolin[Title/Abstract] AND (EGFR[Title/Abstract] OR \"epidermal growth factor receptor\"[Title/Abstract]) AND 1940:2026/09/26[Date - Publication]",
+        "source": "https://pubmed.ncbi.nlm.nih.gov/?term=luteolin%5BTitle%2FAbstract%5D+AND+%28EGFR%5BTitle%2FAbstract%5D+OR+%22epidermal+growth+factor+receptor%22%5BTitle%2FAbstract%5D%29+AND+1940%3A2026%2F09%2F26%5BDate+-+Publication%5D",
+        "date": "2026-09-26"
+      },
+      "risk": "SwissADME 提示 catechol_A PAINS 结构警示和 CYP1A2/2D6/3A4 抑制预测；待核验。",
+      "adme_prediction": {
+        "source": "https://www.swissadme.ch/results/965266841/swissadme.csv",
+        "query_date": "2026-09-26",
+        "GI_absorption": "High",
+        "BBB_permeant": "No",
+        "Lipinski": "Yes; 0 violation",
+        "PAINS": "1 alert: catechol_A",
+        "CYP1A2_inhibitor": "Yes",
+        "CYP2D6_inhibitor": "Yes",
+        "CYP3A4_inhibitor": "Yes"
+      }
+    },
+    {
+      "id": "C003",
+      "name": "黄芩素",
+      "cid": 5281605,
+      "identity": {
+        "status": "verified",
+        "source": "https://pubchem.ncbi.nlm.nih.gov/compound/5281605"
+      },
+      "evidence": "PMID 27586635：H-460 肺癌模型，摘要重点为 VEGF 等变化；直接 EGFR 关系待核验。",
+      "filter": {
+        "status": "unknown",
+        "policy": null,
+        "source": null,
+        "reason": "已获得 SwissADME 预测，但综合硬过滤规则未确定；对接协议共晶回放自检亦未通过，故不得作为正式排名候选。"
+      },
+      "docking": {
+        "score": -8.042,
+        "target": "EGFR WT, PDB 1M17 chain A",
+        "protocol": "1M17-WT-Vina-1.2.7-ex16-seed20260926-v1",
+        "source": "对接复现/prepared/C003.log",
+        "validation": "failed",
+        "pose": "对接复现/prepared/C003-out.pdbqt"
+      },
+      "heat": {
+        "count": 70,
+        "query": "baicalein[Title/Abstract] AND (EGFR[Title/Abstract] OR \"epidermal growth factor receptor\"[Title/Abstract]) AND 1940:2026/09/26[Date - Publication]",
+        "source": "https://pubmed.ncbi.nlm.nih.gov/?term=baicalein%5BTitle%2FAbstract%5D+AND+%28EGFR%5BTitle%2FAbstract%5D+OR+%22epidermal+growth+factor+receptor%22%5BTitle%2FAbstract%5D%29+AND+1940%3A2026%2F09%2F26%5BDate+-+Publication%5D",
+        "date": "2026-09-26"
+      },
+      "risk": "SwissADME 提示 catechol_A PAINS 结构警示和 CYP1A2/2D6/3A4 抑制预测；待核验。",
+      "adme_prediction": {
+        "source": "https://www.swissadme.ch/results/965266841/swissadme.csv",
+        "query_date": "2026-09-26",
+        "GI_absorption": "High",
+        "BBB_permeant": "No",
+        "Lipinski": "Yes; 0 violation",
+        "PAINS": "1 alert: catechol_A",
+        "CYP1A2_inhibitor": "Yes",
+        "CYP2D6_inhibitor": "Yes",
+        "CYP3A4_inhibitor": "Yes"
+      }
+    }
+  ]
+}

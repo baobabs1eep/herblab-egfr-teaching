@@ -1,0 +1,69 @@
+{
+  "protocol": "EGFR-1M17-WT-Vina-1.2.7-v1",
+  "software": "AutoDock Vina v1.2.7",
+  "scoring": "vina",
+  "receptor": "1M17 chain A, HETATM removed, Meeko 0.8.0 receptor template charges",
+  "box": {
+    "center": [
+      21.697499999999998,
+      0.30299999999999994,
+      52.0925
+    ],
+    "size": [
+      26,
+      22.0,
+      22.0
+    ],
+    "source": "1M17 chain A AQ4 co-crystal heavy-atom bounding box + 5 Å per side"
+  },
+  "exhaustiveness": 16,
+  "seed": 20260926,
+  "cpu": 2,
+  "scores": {
+    "C001": {
+      "score_kcal_mol": -8.434,
+      "log": "C001.log",
+      "pose": "C001-out.pdbqt",
+      "log_sha256": "0e74048fed78bf8a585db700cfe5846c0940d93efe4a01e0677f35678fa79240",
+      "pose_sha256": "56f909d17d242b95b0076541b5457b70c46673b0f380d210ea3d194089431692",
+      "heavy_atoms_first_mode": 22
+    },
+    "C002": {
+      "score_kcal_mol": -8.396,
+      "log": "C002.log",
+      "pose": "C002-out.pdbqt",
+      "log_sha256": "abf9d97ec401b97592fb15c94ecd55e5ad79e5d685562ea99cbf9f53fa51ba2f",
+      "pose_sha256": "12eeff7223a44e95bc1d3f20873e9fbfe1d5307d20d58473738b8d987a887442",
+      "heavy_atoms_first_mode": 21
+    },
+    "C003": {
+      "score_kcal_mol": -8.042,
+      "log": "C003.log",
+      "pose": "C003-out.pdbqt",
+      "log_sha256": "5d6e84429a14ebef70e27c56a249fc6d978d9979244944c42c305479a1cd18c4",
+      "pose_sha256": "df899cfe5b1599293b45fa8f6646c6dc2dd58326952064887392c8ac9776a600",
+      "heavy_atoms_first_mode": 20
+    },
+    "AQ4_native": {
+      "score_kcal_mol": -7.052,
+      "log": "AQ4_native.log",
+      "pose": "AQ4_native-out.pdbqt",
+      "log_sha256": "afc6c153a68c4303144cb05347720077fef1257f9c3f00f7dc3ac67b793a7763",
+      "pose_sha256": "58d5b39c4ad22af529980321f49671552780c4666e97f9c796813218e0657a55",
+      "heavy_atoms_first_mode": 29,
+      "heavy_atom_rmsd_angstrom": 5.9757995425226405,
+      "all_mode_rmsd_angstrom": [
+        5.9757995425226405,
+        1.5315918471338563,
+        6.118996494806014,
+        3.2075997256515656,
+        8.026340919231137,
+        9.10573116797593,
+        8.562972034811601,
+        7.989496171159075,
+        7.471918419125638
+      ]
+    }
+  },
+  "warning": "Single conformer per neutral ligand and one seed; docking score is not measured binding affinity. Native AQ4 redock RMSD is a protocol check, not proof of predictions."
+}

@@ -1,0 +1,21 @@
+{
+  "structure": "https://www.rcsb.org/structure/4I22",
+  "sha256": "7d8cfe99b1e6ee3e8bd5c5a0b198116282cb88e52d15758e2f3949927b5487b9",
+  "target": "EGFR L858R/T790M/V948R chain A, co-crystal IRE (gefitinib)",
+  "caveat": "V948R is a crystallization-associated mutation; not a patient-specific target",
+  "box": {
+    "center": [
+      10.6995,
+      -16.744999999999997,
+      11.5555
+    ],
+    "size": [
+      23,
+      22.0,
+      22.0
+    ],
+    "source": "4I22 chain A IRE co-crystal heavy-atom bounding box + 5 Å per side"
+  },
+  "protein_atoms": 2400,
+  "ire_heavy_atoms": 31
+}

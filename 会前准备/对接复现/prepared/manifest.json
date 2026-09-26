@@ -1,0 +1,46 @@
+{
+  "structure": "https://www.rcsb.org/structure/1M17",
+  "structure_sha256": "5b020cd186307d657de80611793554b074f6936a3443d33f81d9b1a58004962e",
+  "rdkit_version": "2026.03.6",
+  "ligand_prep": "CSV SMILES -> neutral H added -> ETKDG one 3D conformer seed 20260926 -> MMFF 500 iterations",
+  "protein_prep": "1M17 chain A ATOM records; alternate locations blank or A; waters, AQ4 and other HETATM removed",
+  "grid_box": {
+    "center": [
+      21.697499999999998,
+      0.30299999999999994,
+      52.0925
+    ],
+    "size": [
+      26,
+      22.0,
+      22.0
+    ],
+    "source": "1M17 chain A AQ4 co-crystal heavy-atom bounding box + 5 Å per side"
+  },
+  "ligands": [
+    {
+      "id": "C001",
+      "name": "Quercetin",
+      "cid": "5280343",
+      "smiles": "C1=CC(=C(C=C1C2=C(C(=O)C3=C(C=C(C=C3O2)O)O)O)O)O",
+      "MMFF_converged": true,
+      "input_file": "C001.sdf"
+    },
+    {
+      "id": "C002",
+      "name": "Luteolin",
+      "cid": "5280445",
+      "smiles": "C1=CC(=C(C=C1C2=CC(=O)C3=C(C=C(C=C3O2)O)O)O)O",
+      "MMFF_converged": true,
+      "input_file": "C002.sdf"
+    },
+    {
+      "id": "C003",
+      "name": "Baicalein",
+      "cid": "5281605",
+      "smiles": "C1=CC=C(C=C1)C2=CC(=O)C3=C(O2)C=C(C(=C3O)O)O",
+      "MMFF_converged": true,
+      "input_file": "C003.sdf"
+    }
+  ]
+}

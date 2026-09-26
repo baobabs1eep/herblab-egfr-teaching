@@ -1,0 +1,27 @@
+{
+  "header": {
+    "type": "esearch",
+    "version": "0.3"
+  },
+  "esearchresult": {
+    "count": "449",
+    "retmax": "3",
+    "retstart": "0",
+    "idlist": [
+      "42761119",
+      "42747859",
+      "42736283"
+    ],
+    "translationset": [
+      {
+        "from": "quercetin",
+        "to": "\"quercetin\"[Supplementary Concept] OR \"quercetin\"[All Fields] OR \"quercetin\"[MeSH Terms] OR \"quercetin's\"[All Fields] OR \"quercetine\"[All Fields] OR \"quercetins\"[All Fields]"
+      },
+      {
+        "from": "EGFR",
+        "to": "\"erbb receptors\"[Supplementary Concept] OR \"erbb receptors\"[All Fields] OR \"egfr\"[All Fields] OR \"egfr protein, human\"[Supplementary Concept] OR \"egfr protein, human\"[All Fields] OR \"erbb receptors\"[MeSH Terms] OR (\"erbb\"[All Fields] AND \"receptors\"[All Fields])"
+      }
+    ],
+    "querytranslation": "(\"quercetin\"[Supplementary Concept] OR \"quercetin\"[All Fields] OR \"quercetin\"[MeSH Terms] OR \"quercetin s\"[All Fields] OR \"quercetine\"[All Fields] OR \"quercetins\"[All Fields]) AND (\"erbb receptors\"[Supplementary Concept] OR \"erbb receptors\"[All Fields] OR \"egfr\"[All Fields] OR \"egfr protein human\"[Supplementary Concept] OR \"egfr protein human\"[All Fields] OR \"erbb receptors\"[MeSH Terms] OR (\"erbb\"[All Fields] AND \"receptors\"[All Fields]))"
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "metadata": {
+    "version": "egfr-teaching-2026-09-26-v1",
+    "target": "EGFR（具体突变体与受体结构待确定）",
+    "protocol": null,
+    "filterPolicy": null,
+    "heatDefinition": null,
+    "heatDate": null,
+    "source": "会前准备/肺癌EGFR教学候选_首批核验.csv",
+    "description": "三条真实教学资料；尚无统一对接、硬过滤与热度记录。"
+  },
+  "candidates": [
+    {
+      "id": "C001",
+      "name": "槲皮素",
+      "cid": 5280343,
+      "identity": {
+        "status": "verified",
+        "source": "https://pubchem.ncbi.nlm.nih.gov/compound/5280343"
+      },
+      "evidence": "PMID 34572484：EGFR C797S 耐药模型；摘要提出 AXL 相关机制，非直接 EGFR 靶向确证。",
+      "filter": {
+        "status": "unknown",
+        "policy": null,
+        "source": null,
+        "reason": "尚未执行统一成药性／ADMET 风险过滤"
+      },
+      "docking": {
+        "score": null,
+        "target": null,
+        "protocol": null,
+        "source": null
+      },
+      "heat": {
+        "count": null,
+        "query": null,
+        "source": null,
+        "date": null
+      },
+      "risk": "ADMET 与毒性待计算；样例论文不能替代过滤"
+    },
+    {
+      "id": "C002",
+      "name": "木犀草素",
+      "cid": 5280445,
+      "identity": {
+        "status": "verified",
+        "source": "https://pubchem.ncbi.nlm.nih.gov/compound/5280445"
+      },
+      "evidence": "PMID 24471765：EGFR L858R/T790M 模型；突变 EGFR 降解及 Hsp90 相互作用。",
+      "filter": {
+        "status": "unknown",
+        "policy": null,
+        "source": null,
+        "reason": "尚未执行统一成药性／ADMET 风险过滤"
+      },
+      "docking": {
+        "score": null,
+        "target": null,
+        "protocol": null,
+        "source": null
+      },
+      "heat": {
+        "count": null,
+        "query": null,
+        "source": null,
+        "date": null
+      },
+      "risk": "ADMET 与毒性待计算；样例论文不能替代过滤"
+    },
+    {
+      "id": "C003",
+      "name": "黄芩素",
+      "cid": 5281605,
+      "identity": {
+        "status": "verified",
+        "source": "https://pubchem.ncbi.nlm.nih.gov/compound/5281605"
+      },
+      "evidence": "PMID 27586635：H-460 肺癌模型，摘要重点为 VEGF 等变化；直接 EGFR 关系待核验。",
+      "filter": {
+        "status": "unknown",
+        "policy": null,
+        "source": null,
+        "reason": "尚未执行统一成药性／ADMET 风险过滤"
+      },
+      "docking": {
+        "score": null,
+        "target": null,
+        "protocol": null,
+        "source": null
+      },
+      "heat": {
+        "count": null,
+        "query": null,
+        "source": null,
+        "date": null
+      },
+      "risk": "ADMET 与毒性待计算；样例论文不能替代过滤"
+    }
+  ]
+}

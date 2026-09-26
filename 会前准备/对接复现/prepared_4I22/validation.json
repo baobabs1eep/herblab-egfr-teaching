@@ -1,0 +1,12 @@
+{
+  "structure": "4I22",
+  "ligand": "IRE (gefitinib)",
+  "heavy_atoms": 31,
+  "top_pose_rmsd_angstrom": 3.629,
+  "passes_2_angstrom": false,
+  "input_sha256": "7d8cfe99b1e6ee3e8bd5c5a0b198116282cb88e52d15758e2f3949927b5487b9",
+  "log_sha256": "64905f08fee3d4146939c472099c74f7e354e476d6e1b0efd533cf5397e687e9",
+  "log": "IRE_native.log",
+  "pose": "IRE_native-out.pdbqt",
+  "protocol": "AutoDock Vina 1.2.7; vina scoring; chain A rigid receptor; exhaustiveness 16; seed 20260926; CPU 2"
+}

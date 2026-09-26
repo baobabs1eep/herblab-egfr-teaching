@@ -1,0 +1,62 @@
+{
+  "version": "egfr-basic-property-screen-v1",
+  "definition": "Pass only when SwissADME Lipinski is Yes; 0 violation AND predicted GI absorption is High. Missing inputs -> unknown. Other values -> fail. PAINS/CYP are retained as warnings, not used for binary exclusion.",
+  "date": "2026-09-27",
+  "candidates": [
+    {
+      "id": "C001",
+      "name": "槲皮素",
+      "policy": "egfr-basic-property-screen-v1",
+      "status": "pass",
+      "checks": {
+        "Lipinski": "Yes; 0 violation",
+        "GI_absorption": "High"
+      },
+      "warnings": {
+        "PAINS": "1 alert: catechol_A",
+        "CYP1A2_inhibitor": "Yes",
+        "CYP2D6_inhibitor": "Yes",
+        "CYP3A4_inhibitor": "Yes"
+      },
+      "source": "https://www.swissadme.ch/results/965266841/swissadme.csv",
+      "scope": "Basic predicted properties only; no toxicity or clinical safety decision"
+    },
+    {
+      "id": "C002",
+      "name": "木犀草素",
+      "policy": "egfr-basic-property-screen-v1",
+      "status": "pass",
+      "checks": {
+        "Lipinski": "Yes; 0 violation",
+        "GI_absorption": "High"
+      },
+      "warnings": {
+        "PAINS": "1 alert: catechol_A",
+        "CYP1A2_inhibitor": "Yes",
+        "CYP2D6_inhibitor": "Yes",
+        "CYP3A4_inhibitor": "Yes"
+      },
+      "source": "https://www.swissadme.ch/results/965266841/swissadme.csv",
+      "scope": "Basic predicted properties only; no toxicity or clinical safety decision"
+    },
+    {
+      "id": "C003",
+      "name": "黄芩素",
+      "policy": "egfr-basic-property-screen-v1",
+      "status": "pass",
+      "checks": {
+        "Lipinski": "Yes; 0 violation",
+        "GI_absorption": "High"
+      },
+      "warnings": {
+        "PAINS": "1 alert: catechol_A",
+        "CYP1A2_inhibitor": "Yes",
+        "CYP2D6_inhibitor": "Yes",
+        "CYP3A4_inhibitor": "Yes"
+      },
+      "source": "https://www.swissadme.ch/results/965266841/swissadme.csv",
+      "scope": "Basic predicted properties only; no toxicity or clinical safety decision"
+    }
+  ],
+  "limitation": "This is a basic property screen, not complete ADMET, toxicity, pharmacokinetics, or safety clearance. It does not override docking validation failure."
+}

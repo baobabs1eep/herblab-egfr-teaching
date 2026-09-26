@@ -1,0 +1,134 @@
+{
+  "metadata": {
+    "version": "egfr-teaching-heat-adme-2026-09-26-v1",
+    "target": "EGFR（具体突变体与受体结构待确定）",
+    "protocol": null,
+    "filterPolicy": null,
+    "heatDefinition": "PubMed: 英文分子名[Title/Abstract] AND (EGFR[Title/Abstract] OR \"epidermal growth factor receptor\"[Title/Abstract]) AND 1940:2026/09/26[Date - Publication]; 未纳入同义词",
+    "heatDate": "2026-09-26",
+    "source": "会前准备/肺癌EGFR教学候选_首批核验.csv",
+    "description": "已补同口径 PubMed 检索数及 SwissADME 预测；仍缺统一 EGFR 对接与经确认的硬过滤政策，暂不产生真实排名。"
+  },
+  "candidates": [
+    {
+      "id": "C001",
+      "name": "槲皮素",
+      "cid": 5280343,
+      "identity": {
+        "status": "verified",
+        "source": "https://pubchem.ncbi.nlm.nih.gov/compound/5280343"
+      },
+      "evidence": "PMID 34572484：EGFR C797S 耐药模型；摘要提出 AXL 相关机制，非直接 EGFR 靶向确证。",
+      "filter": {
+        "status": "unknown",
+        "policy": null,
+        "source": null,
+        "reason": "SwissADME 已出预测，但未制定和执行统一硬过滤政策；不能自动判 pass。"
+      },
+      "docking": {
+        "score": null,
+        "target": null,
+        "protocol": null,
+        "source": null
+      },
+      "heat": {
+        "count": 453,
+        "query": "quercetin[Title/Abstract] AND (EGFR[Title/Abstract] OR \"epidermal growth factor receptor\"[Title/Abstract]) AND 1940:2026/09/26[Date - Publication]",
+        "source": "https://pubmed.ncbi.nlm.nih.gov/?term=quercetin%5BTitle%2FAbstract%5D+AND+%28EGFR%5BTitle%2FAbstract%5D+OR+%22epidermal+growth+factor+receptor%22%5BTitle%2FAbstract%5D%29+AND+1940%3A2026%2F09%2F26%5BDate+-+Publication%5D",
+        "date": "2026-09-26"
+      },
+      "risk": "SwissADME 提示 catechol_A PAINS 结构警示和 CYP1A2/2D6/3A4 抑制预测；待核验。",
+      "adme_prediction": {
+        "source": "https://www.swissadme.ch/results/965266841/swissadme.csv",
+        "query_date": "2026-09-26",
+        "GI_absorption": "High",
+        "BBB_permeant": "No",
+        "Lipinski": "Yes; 0 violation",
+        "PAINS": "1 alert: catechol_A",
+        "CYP1A2_inhibitor": "Yes",
+        "CYP2D6_inhibitor": "Yes",
+        "CYP3A4_inhibitor": "Yes"
+      }
+    },
+    {
+      "id": "C002",
+      "name": "木犀草素",
+      "cid": 5280445,
+      "identity": {
+        "status": "verified",
+        "source": "https://pubchem.ncbi.nlm.nih.gov/compound/5280445"
+      },
+      "evidence": "PMID 24471765：EGFR L858R/T790M 模型；突变 EGFR 降解及 Hsp90 相互作用。",
+      "filter": {
+        "status": "unknown",
+        "policy": null,
+        "source": null,
+        "reason": "SwissADME 已出预测，但未制定和执行统一硬过滤政策；不能自动判 pass。"
+      },
+      "docking": {
+        "score": null,
+        "target": null,
+        "protocol": null,
+        "source": null
+      },
+      "heat": {
+        "count": 214,
+        "query": "luteolin[Title/Abstract] AND (EGFR[Title/Abstract] OR \"epidermal growth factor receptor\"[Title/Abstract]) AND 1940:2026/09/26[Date - Publication]",
+        "source": "https://pubmed.ncbi.nlm.nih.gov/?term=luteolin%5BTitle%2FAbstract%5D+AND+%28EGFR%5BTitle%2FAbstract%5D+OR+%22epidermal+growth+factor+receptor%22%5BTitle%2FAbstract%5D%29+AND+1940%3A2026%2F09%2F26%5BDate+-+Publication%5D",
+        "date": "2026-09-26"
+      },
+      "risk": "SwissADME 提示 catechol_A PAINS 结构警示和 CYP1A2/2D6/3A4 抑制预测；待核验。",
+      "adme_prediction": {
+        "source": "https://www.swissadme.ch/results/965266841/swissadme.csv",
+        "query_date": "2026-09-26",
+        "GI_absorption": "High",
+        "BBB_permeant": "No",
+        "Lipinski": "Yes; 0 violation",
+        "PAINS": "1 alert: catechol_A",
+        "CYP1A2_inhibitor": "Yes",
+        "CYP2D6_inhibitor": "Yes",
+        "CYP3A4_inhibitor": "Yes"
+      }
+    },
+    {
+      "id": "C003",
+      "name": "黄芩素",
+      "cid": 5281605,
+      "identity": {
+        "status": "verified",
+        "source": "https://pubchem.ncbi.nlm.nih.gov/compound/5281605"
+      },
+      "evidence": "PMID 27586635：H-460 肺癌模型，摘要重点为 VEGF 等变化；直接 EGFR 关系待核验。",
+      "filter": {
+        "status": "unknown",
+        "policy": null,
+        "source": null,
+        "reason": "SwissADME 已出预测，但未制定和执行统一硬过滤政策；不能自动判 pass。"
+      },
+      "docking": {
+        "score": null,
+        "target": null,
+        "protocol": null,
+        "source": null
+      },
+      "heat": {
+        "count": 70,
+        "query": "baicalein[Title/Abstract] AND (EGFR[Title/Abstract] OR \"epidermal growth factor receptor\"[Title/Abstract]) AND 1940:2026/09/26[Date - Publication]",
+        "source": "https://pubmed.ncbi.nlm.nih.gov/?term=baicalein%5BTitle%2FAbstract%5D+AND+%28EGFR%5BTitle%2FAbstract%5D+OR+%22epidermal+growth+factor+receptor%22%5BTitle%2FAbstract%5D%29+AND+1940%3A2026%2F09%2F26%5BDate+-+Publication%5D",
+        "date": "2026-09-26"
+      },
+      "risk": "SwissADME 提示 catechol_A PAINS 结构警示和 CYP1A2/2D6/3A4 抑制预测；待核验。",
+      "adme_prediction": {
+        "source": "https://www.swissadme.ch/results/965266841/swissadme.csv",
+        "query_date": "2026-09-26",
+        "GI_absorption": "High",
+        "BBB_permeant": "No",
+        "Lipinski": "Yes; 0 violation",
+        "PAINS": "1 alert: catechol_A",
+        "CYP1A2_inhibitor": "Yes",
+        "CYP2D6_inhibitor": "Yes",
+        "CYP3A4_inhibitor": "Yes"
+      }
+    }
+  ]
+}
