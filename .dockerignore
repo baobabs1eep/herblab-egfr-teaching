@@ -1,0 +1,10 @@
+.git
+.env
+**/.env
+**/vendor
+**/__pycache__
+会前准备
+*.pdf
+*.docx
+*.md
+本地服务/*.test.cjs

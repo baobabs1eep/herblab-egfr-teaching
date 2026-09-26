@@ -2,13 +2,34 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const config = {};
-for (const line of fs.readFileSync(path.join(__dirname, '.env'), 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/)) {
+const envFile = path.join(__dirname, '.env');
+for (const line of (fs.existsSync(envFile) ? fs.readFileSync(envFile, 'utf8') : '').replace(/^\uFEFF/, '').split(/\r?\n/)) {
   const m = line.match(/^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/);
   if (m) config[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
 }
+for (const key of ['PORT','HOST','PUBLIC_ORIGIN','DEMO_USER','DEMO_PASSWORD','YUANQI_APP_ID','YUANQI_APP_KEY']) {
+  if (process.env[key] !== undefined) config[key] = process.env[key];
+}
 const port = Number(config.PORT || 8787);
-const configured = !!config.YUANQI_APP_ID && !!config.YUANQI_APP_KEY && !config.YUANQI_APP_KEY.includes('请将');
+const host = config.HOST || '127.0.0.1';
+const publicMode = !['127.0.0.1','localhost','::1'].includes(host);
+const publicOrigin = config.PUBLIC_ORIGIN ? new URL(config.PUBLIC_ORIGIN).origin : null;
+if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT 必须为有效端口。');
+if (publicMode && (!publicOrigin || !publicOrigin.startsWith('https://') || !config.DEMO_PASSWORD || config.DEMO_PASSWORD.length < 12)) throw new Error('公网模式必须设置 HTTPS 的 PUBLIC_ORIGIN 和至少 12 位的 DEMO_PASSWORD。');
+const configured = !!config.YUANQI_APP_ID && !!config.YUANQI_APP_KEY && !/^请/.test(config.YUANQI_APP_KEY);
+const allowedHosts = publicMode ? [new URL(publicOrigin).host] : [`127.0.0.1:${port}`, `localhost:${port}`];
+function authenticated(req) {
+  if (!publicMode) return true;
+  const value = req.headers.authorization || '';
+  if (!value.startsWith('Basic ')) return false;
+  let plain;
+  try { plain = Buffer.from(value.slice(6), 'base64').toString('utf8'); } catch { return false; }
+  const given = Buffer.from(plain);
+  const expected = Buffer.from(`${config.DEMO_USER || 'demo'}:${config.DEMO_PASSWORD}`);
+  return given.length === expected.length && crypto.timingSafeEqual(given, expected);
+}
 const root = path.resolve(__dirname, '../演示前端');
 const assets = new Map([['/', ['index.html','text/html']], ['/index.html',['index.html','text/html']], ['/app.js',['app.js','text/javascript']], ['/style.css',['style.css','text/css']], ['/lucide.min.js',['lucide.min.js','text/javascript']], ['/quercetin.png',['quercetin.png','image/png']]]);
 for (const file of ['ranking.js','ranking-data.js','ranking-ui.js']) assets.set('/'+file,[file,'text/javascript']);
@@ -22,11 +43,12 @@ async function body(req) {
 }
 const server = http.createServer(async (req, res) => {
   // Bind and host restrictions prevent exposing the local key proxy to other websites.
-  if (![`127.0.0.1:${port}`, `localhost:${port}`].includes(req.headers.host)) return json(res,403,{error:'仅允许本机访问。'});
+  if (!allowedHosts.includes(req.headers.host)) return json(res,403,{error:'访问地址不正确。'});
   const route = new URL(req.url,'http://localhost').pathname;
-  if (req.method === 'GET' && route === '/api/health') return json(res,200,{configured,service:'herblab-local'});
+  if (req.method === 'GET' && route === '/api/health') return json(res,200,{configured,service:publicMode?'herblab-public':'herblab-local'});
+  if (!authenticated(req)) { res.writeHead(401,{'WWW-Authenticate':'Basic realm="HerbLab Demo"','Cache-Control':'no-store'}); return res.end('Authentication required'); }
   if (req.method === 'POST' && route === '/api/chat') {
-    const expected = `http://${req.headers.host}`;
+    const expected = publicMode ? publicOrigin : `http://${req.headers.host}`;
     if (req.headers.origin && req.headers.origin !== expected) return json(res,403,{error:'请从本地研学页面发送问题。'});
     if (!(req.headers['content-type'] || '').startsWith('application/json')) return json(res,415,{error:'请求格式应为 JSON。'});
     if (!configured) return json(res,503,{error:'请填写本地服务 .env 中的元器密钥，然后重启服务。'});
@@ -69,4 +91,4 @@ const server = http.createServer(async (req, res) => {
   catch { json(res,500,{error:'页面文件缺失。'}); }
 });
 server.on('error', err => { console.error(err.code==='EADDRINUSE'?'端口已占用：请检查是否已经启动研学助手。':'本地服务启动失败。'); process.exitCode=1; });
-server.listen(port,'127.0.0.1',()=>console.log(`研学助手已启动：http://127.0.0.1:${port} | API配置：${configured?'已填写':'待填写'}`));
+server.listen(port,host,()=>console.log(`研学助手已启动：${publicMode?publicOrigin:`http://127.0.0.1:${port}`} | API配置：${configured?'已填写':'待填写'}`));

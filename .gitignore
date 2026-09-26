@@ -1,5 +1,6 @@
 .env
 **/.env
+deploy.env
 **/vendor/
 **/__pycache__/
 *.pyc
