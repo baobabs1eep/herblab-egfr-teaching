@@ -18,7 +18,7 @@ const publicMode = !['127.0.0.1','localhost','::1'].includes(host);
 const publicOrigin = config.PUBLIC_ORIGIN ? new URL(config.PUBLIC_ORIGIN).origin : null;
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT 必须为有效端口。');
 if (publicMode && (!publicOrigin || !publicOrigin.startsWith('https://') || !config.DEMO_PASSWORD || config.DEMO_PASSWORD.length < 12)) throw new Error('公网模式必须设置 HTTPS 的 PUBLIC_ORIGIN 和至少 12 位的 DEMO_PASSWORD。');
-const configured = !!config.YUANQI_APP_ID && !!config.YUANQI_APP_KEY && !/^请/.test(config.YUANQI_APP_KEY);
+const configured = !!config.YUANQI_APP_ID && !!config.YUANQI_APP_KEY && !/^(请|replace-with-)/i.test(config.YUANQI_APP_KEY);
 const allowedHosts = publicMode ? [new URL(publicOrigin).host] : [`127.0.0.1:${port}`, `localhost:${port}`];
 function authenticated(req) {
   if (!publicMode) return true;

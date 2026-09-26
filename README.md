@@ -29,3 +29,5 @@
 | `YUANQI_APP_KEY` | 元器 API 密钥，只填服务器运行环境，不提交 Git |
 
 公网模式下，浏览器会先要求输入演示用户名和密码；服务限制访问域名、跨站请求和并发聊天。没有 HTTPS 地址或演示密码时，服务会拒绝以公网模式启动。`GET /api/health` 可用于同域名健康检查。当前仓库**尚未部署到服务器**；购买服务器、开通公网 80/443、配置 HTTPS、填入服务器环境变量和验证元器连通性仍需完成。
+
+在 Ubuntu 服务器上可用仓库中的 `compose.yaml` 和 `Caddyfile` 部署。将 `deploy.env.example` 复制为不会提交 Git 的 `deploy.env`，填写 `DEMO_DOMAIN`、相同域名的 `PUBLIC_ORIGIN`、独立演示密码及元器密钥，然后执行 `docker compose --env-file deploy.env up --build -d`。Caddy 接管公网 80/443 和 HTTPS；Node 容器不直接暴露公网端口。若只是临时演示且没有域名，可在有公网 IPv4 的服务器上暂用 `<公网IP>.nip.io` 这样的 DNS 名称并现场测试；这是第三方临时 DNS 服务，不宜作为长期正式域名。不要直接用明文 HTTP 输入演示密码。
