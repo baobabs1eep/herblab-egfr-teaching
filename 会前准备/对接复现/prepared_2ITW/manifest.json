@@ -1,0 +1,21 @@
+{
+  "structure": "https://www.rcsb.org/structure/2ITW",
+  "sha256": "0c7c0f71b4404f661985edff4b967b7343a51eb5526bf2ff3a4c74dd7a0bd45f",
+  "target": "EGFR WT chain A co-crystal ITQ/AFN941",
+  "box": {
+    "center": [
+      -49.431,
+      -1.3030000000000002,
+      -20.1625
+    ],
+    "size": [
+      22.0,
+      22.0,
+      22.0
+    ],
+    "source": "2ITW chain A ITQ co-crystal heavy-atom bbox + 5 Å each side"
+  },
+  "protein_atoms": 2395,
+  "ligand_atoms": 35,
+  "ligand_smiles_source": "https://www.rcsb.org/ligand/ITQ"
+}

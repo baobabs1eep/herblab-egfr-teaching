@@ -37,3 +37,4 @@ def run(directory, label):
 
 run(ROOT/'prepared','AQ4_native')
 run(ROOT/'prepared_4I22','IRE_native')
+run(ROOT/'prepared_2ITW','ITQ_native')

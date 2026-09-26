@@ -1,0 +1,39 @@
+{
+  "protocol": "2ITW-WT-Vina-1.2.7-vina-ex16-seed20260926-v1",
+  "scores_kcal_mol": {
+    "20260926": {
+      "C001": -8.198,
+      "C002": -7.969,
+      "C003": -7.8
+    },
+    "20260927": {
+      "C001": -8.198,
+      "C002": -7.943,
+      "C003": -7.798
+    },
+    "20260928": {
+      "C001": -8.205,
+      "C002": -7.937,
+      "C003": -7.799
+    }
+  },
+  "order_low_to_high": {
+    "20260926": [
+      "C001",
+      "C002",
+      "C003"
+    ],
+    "20260927": [
+      "C001",
+      "C002",
+      "C003"
+    ],
+    "20260928": [
+      "C001",
+      "C002",
+      "C003"
+    ]
+  },
+  "order_stable_in_three_seeds": true,
+  "limitation": "Only three random seeds of one rigid receptor and one ligand state; this is a limited numerical sensitivity check, not predictive validation."
+}

@@ -1,5 +1,4 @@
-// EGFR 2ITW 教学数据；对接与基础性质预筛不能证明疗效或安全性。
-window.HerbRankingData={
+{
   "metadata": {
     "version": "egfr-wt-2itw-teaching-double-ranking-2026-09-27-v1",
     "target": "EGFR WT, PDB 2ITW chain A (ATP site)",
@@ -216,4 +215,4 @@ window.HerbRankingData={
       }
     }
   ]
-};
+}

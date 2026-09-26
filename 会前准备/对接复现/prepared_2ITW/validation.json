@@ -1,0 +1,32 @@
+{
+  "structure": "https://www.rcsb.org/structure/2ITW",
+  "reference_ligand": "ITQ/AFN941",
+  "top_pose_heavy_atom_rmsd_angstrom": 0.913,
+  "predeclared_threshold_angstrom": 2,
+  "passes": true,
+  "reference_score_kcal_mol": -9.911,
+  "protein_prep": "chain A ATOM records; waters/HETATM removed; incomplete A:1018 (single N atom) ignored by Meeko because 6.8178 Å outside box",
+  "ligand_prep": "native ITQ coordinates and RCSB ITQ bond-order template, Meeko 0.8.0",
+  "box": {
+    "center": [
+      -49.431,
+      -1.3030000000000002,
+      -20.1625
+    ],
+    "size": [
+      22.0,
+      22.0,
+      22.0
+    ],
+    "source": "2ITW chain A ITQ co-crystal heavy-atom bbox + 5 Å each side"
+  },
+  "vina_version": "1.2.7",
+  "scoring": "vina",
+  "exhaustiveness": 16,
+  "seed": 20260926,
+  "cpu": 2,
+  "receptor_pdbqt_sha256": "be091ecbb13b1d2eb33e56f40a0400360e687a86a9f22b3a2f7dfe477568382a",
+  "log_sha256": "f15669944cd9fb6a827f587cc16fc0f9b81ff2b4bc686e76ad25f3641ab08dad",
+  "pose_sha256": "8fd7db7687f6964126f4bc80c7f9fe73faa67ba058a2475ffa7c4feb3527dbad",
+  "limitation": "One reference ligand redocking checks pose recovery, not prospective binding-affinity or safety accuracy."
+}
