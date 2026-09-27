@@ -1,4 +1,4 @@
-// EGFR 2ITW 教学数据；对接与基础性质预筛不能证明疗效或安全性。
+// 同协议 EGFR 2ITW 教学数据；参数为未校准的教学演示选择。
 window.HerbRankingData={
   "metadata": {
     "version": "egfr-wt-2itw-teaching-double-ranking-2026-09-27-v1",
@@ -215,5 +215,11 @@ window.HerbRankingData={
         "CYP3A4_inhibitor": "Yes"
       }
     }
-  ]
+  ],
+  "recommendedParameters": {
+    "strong": -12,
+    "weak": -4,
+    "minBase": 45,
+    "bonus": 10
+  }
 };

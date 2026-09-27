@@ -1,0 +1,22 @@
+[Unit]
+Description=HerbLab teaching demo
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=herblab
+Group=herblab
+WorkingDirectory=/opt/herblab
+ExecStart=/usr/bin/node /opt/herblab/本地服务/server.cjs
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/herblab
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

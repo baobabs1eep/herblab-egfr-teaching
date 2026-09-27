@@ -1,0 +1,6 @@
+[Unit]
+Description=Renew HerbLab HTTPS certificate
+
+[Service]
+Type=oneshot
+ExecStart=/opt/certbot/bin/certbot renew --quiet --deploy-hook "/bin/systemctl reload nginx"

@@ -1,6 +1,11 @@
 .env
 **/.env
 deploy.env
+**/.htpasswd*
+**/herblab-access.txt
+**/*.pem
+**/*.key
+公网部署/herblab-release.tar.gz
 **/vendor/
 **/__pycache__/
 *.pyc
