@@ -33,3 +33,8 @@ nav a .step{align-self:flex-start;margin-left:auto;margin-top:2px;color:#97a99c}
 @media(max-width:1150px){.shell{grid-template-columns:220px minmax(0,1fr)}}
 @media(max-width:800px){.candidate-grid{grid-template-columns:1fr}.path-grid{grid-template-columns:1fr}}
 @media(max-width:620px){.shell{display:block}.sidebar{height:auto;position:static;padding:14px 14px 12px}.course,.side-bottom,.nav-label{display:none}nav{display:flex;overflow-x:auto;gap:7px;margin-top:13px;padding:2px 1px 8px;scrollbar-width:thin}nav:before{display:none}nav a,nav a.active{min-height:54px;flex:0 0 142px;padding:8px;transform:none}nav a>svg{width:25px;height:25px;padding:5px}.nav-copy strong{font-size:10px}.nav-copy small{font-size:8px}.nav-copy{gap:3px}nav a .step{display:none}.page-heading{padding:16px}.section.flow-card{padding:16px}.path-grid,.candidate-grid{grid-template-columns:1fr}.flow-fields{grid-template-columns:1fr}}
+@media print {
+  body * { visibility: hidden; }
+  #printableReport, #printableReport * { visibility: visible; }
+  #printableReport { position: absolute; left: 0; top: 0; width: 100%; padding: 0; margin: 0; white-space: pre-wrap; overflow: visible; max-height: none; background: white; color: black; font: 11pt/1.6 sans-serif; }
+}
