@@ -1,0 +1,49 @@
+{
+  "template_only": true,
+  "schema_version": "1.0",
+  "records": [],
+  "schema": {
+    "record_id": "服务端生成的研究记录标识",
+    "disease": {
+      "display_name": "疾病显示名",
+      "aliases": ["常见别名或英文名"],
+      "source_query": "实际提交给 PubMed 的查询式"
+    },
+    "candidate": {
+      "name": "候选化学物质名称",
+      "source_annotation": "PubTator3 / HERB / TCMSP / COCONUT 等候选注释来源",
+      "authoritative_identity_source": "PubChem 或其他明确的结构身份来源",
+      "pubchem_cid": null,
+      "canonical_smiles": null,
+      "inchikey": null
+    },
+    "evidence": [
+      {
+        "pmid": "PMID 字符串",
+        "title": "论文题名",
+        "abstract": "摘要或允许保存的摘要文本",
+        "evidence_scope": "模型、疾病、靶点和结论适用范围",
+        "source_url": "可复核的 PubMed URL",
+        "review_status": "pending"
+      }
+    ],
+    "natural_product_lookup": {
+      "source": "COCONUT",
+      "identifier": null,
+      "source_url": null,
+      "review_status": "pending"
+    },
+    "ranking": {
+      "status": "not_generated",
+      "protocol_id": null,
+      "validated_data": false,
+      "reason": "没有匹配协议和已核验数据时保持 not_generated"
+    },
+    "provenance": {
+      "server_issued": false,
+      "source_versions": [],
+      "retrieved_at": null,
+      "reviewer": null
+    }
+  }
+}
