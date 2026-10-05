@@ -147,7 +147,7 @@ document.addEventListener('click',async e=>{const next=e.target.closest('[data-n
  if(e.target.closest('#sendChat'))sendChat();
  if(e.target.closest('#retryChat'))sendChat();
  if(e.target.closest('#outline'))discussionOutline();
- if(e.target.closest('#askPlan')){state.chat.draft=`请讨论当前实验方案草稿，明确指出待核验处。候选：${currentCandidate().name||''}\n${JSON.stringify(state.experiment)}`;save();render();document.querySelector('#chatDraft')?.focus();}
+ if(e.target.closest('#askPlan')){state.chat.draft=`请讨论当前实验方案草稿，明确指出待核验处。候选：${currentCandidate().name||''}。请先说明需要核对哪些文献、模型、对照和观察指标；我的实验和结果草稿未附带。`;save();render();document.querySelector('#chatDraft')?.focus();}
  if(!state.chat.loading&&e.target.closest('#clearChat')){state.chat.messages=[];state.chat.error='';state.chat.draft='';save();render();document.querySelector('#chatDraft')?.focus();}
  if(e.target.closest('#download')){const url=URL.createObjectURL(new Blob(['\ufeff'+completeReportText()],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;const c=currentCandidate();a.download=`${(c.disease?.label||c.name||'研究记录').replace(/[\\/:*?"<>|]/g,'_')}研究记录.txt`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('报告已导出');}
  if(e.target.closest('#printReport')){const pre=document.querySelector('#printableReport');if(pre){pre.textContent=completeReportText();pre.parentElement.open=true;}window.print();}
