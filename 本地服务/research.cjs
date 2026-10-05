@@ -6,6 +6,7 @@ const PUBTATOR = 'https://www.ncbi.nlm.nih.gov/research/pubtator3-api/publicatio
 const EUROPEPMC = 'https://www.ebi.ac.uk/europepmc/webservices/rest/search';
 const ALIASES = new Map([
   ['三叉神经痛', ['Trigeminal neuralgia', 'trigeminal neuralgia']], ['trigeminal neuralgia', ['Trigeminal neuralgia', 'trigeminal neuralgia']],
+  ['高血压', ['高血压', 'hypertension']], ['原发性高血压', ['原发性高血压', 'primary hypertension']], ['hypertension', ['Hypertension', 'hypertension']], ['primary hypertension', ['Primary hypertension', 'primary hypertension']],
   ['肺癌', ['Lung cancer', 'lung cancer']], ['lung cancer', ['Lung cancer', 'lung cancer']],
   ['非小细胞肺癌', ['Non-small cell lung cancer', 'non-small cell lung cancer']], ['non-small cell lung cancer', ['Non-small cell lung cancer', 'non-small cell lung cancer']],
   ['糖尿病', ['Diabetes mellitus', 'diabetes mellitus']], ['diabetes mellitus', ['Diabetes mellitus', 'diabetes mellitus']],
@@ -29,7 +30,7 @@ function diseaseInput(value) {
   const hit = ALIASES.get(raw.toLowerCase());
   if (hit) return { label: hit[0], term: hit[1] };
   if (/^[\x00-\x7F]+$/.test(raw)) return { label: raw, term: raw };
-  throw new ResearchError('暂未配置这个中文疾病名称，请填写对应英文名称后检索。', 400);
+  return { label: raw, term: '', needsResolution: true };
 }
 function decodeXml(s) { return s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/&(#x?[0-9a-f]+|amp|lt|gt|quot|apos);/gi, (_, x) => { const m = x.toLowerCase(); if (m === 'amp') return '&'; if (m === 'lt') return '<'; if (m === 'gt') return '>'; if (m === 'quot') return '"'; if (m === 'apos') return "'"; const n = m[0] === '#' ? (m[1] === 'x' ? parseInt(m.slice(2), 16) : parseInt(m.slice(1), 10)) : NaN; return Number.isFinite(n) ? String.fromCodePoint(n) : _; }); }
 function tag(xml, name) { const m = xml.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`, 'i')); return m ? decodeXml(m[1].replace(/<[^>]+>/g, '').trim()) : ''; }
@@ -47,7 +48,16 @@ function createResearchService(options = {}) {
   async function bodyJson(url, init) { const r = await pacedFetch(url, init); try { return await r.json(); } catch { throw new ResearchError('上游返回格式无效，请稍后重试。'); } }
   async function bodyText(url) { const r = await pacedFetch(url); return r.text(); }
   async function search(input = {}) {
-    const disease = diseaseInput(input.disease), target = normalizeInput(input.target, 'target', 100), compound = normalizeInput(input.compound, 'compound', 120);
+    let disease = diseaseInput(input.disease);
+    if (disease.needsResolution) {
+      if (typeof options.resolveDisease !== 'function') throw new ResearchError('暂时无法自动识别这个中文疾病名称，请填写对应英文名称后检索。', 400);
+      let term;
+      try { term = normalizeInput(await options.resolveDisease(disease.label), 'normalized disease', 100); }
+      catch (e) { throw new ResearchError(e?.message || '疾病名称自动规范化失败，请填写对应英文名称后检索。', 502); }
+      if (!/^[A-Za-z0-9][A-Za-z0-9 .,'()\/-]{1,99}$/.test(term)) throw new ResearchError('疾病名称自动规范化结果无效，请填写对应英文名称后检索。', 502);
+      disease = { label: disease.label, term, normalizedBy: 'AI' };
+    }
+    const target = normalizeInput(input.target, 'target', 100), compound = normalizeInput(input.compound, 'compound', 120);
     const limit = Math.max(1, Math.min(8, Number.isFinite(Number(input.limit)) ? Number(input.limit) : 8));
     const query = [`("${disease.term}"[Title/Abstract])`]; if (!compound) query.push('("natural product" OR herbal OR flavonoid OR phytochemical OR "plant extract" OR "traditional Chinese medicine")[Title/Abstract]'); if (target) query.push(`("${target}"[Title/Abstract])`); if (compound) query.push(`("${compound}"[Title/Abstract])`); const queryText = query.join(' AND ');
     const key = JSON.stringify([disease.term, target, compound, limit]); const old = cache.get(key); if (old && old.expires > Date.now()) return { ...old.value, cached: true }; if (inflight.has(key)) return inflight.get(key);

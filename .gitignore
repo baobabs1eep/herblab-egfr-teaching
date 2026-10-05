@@ -13,6 +13,7 @@ deploy.env
 *.dll
 *.pyd
 .DS_Store
+.ui-check-profile/
 /大赛预通知(1).pdf
 /工作安排(1).docx
 /第二届全国高校“启真问智”教育教学人工智能大赛作品递交要求(1).pdf

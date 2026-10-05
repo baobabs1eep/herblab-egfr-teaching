@@ -5,7 +5,6 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const {randomUUID} = crypto;
 const {createResearchService} = require('./research.cjs');
-const research = createResearchService();
 const researchSessions = new Map();
 let researchActive = 0;
 const config = {};
@@ -29,6 +28,26 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT �
 if (publicMode && (!publicOrigin || !publicOrigin.startsWith('https://') || !config.DEMO_PASSWORD || config.DEMO_PASSWORD.length < 12)) throw new Error('公网模式必须设置 HTTPS 的 PUBLIC_ORIGIN 和至少 12 位的 DEMO_PASSWORD。');
 if (proxyMode && (!publicOrigin.startsWith('https://') || new URL(publicOrigin).host !== config.PUBLIC_HOST)) throw new Error('反向代理模式必须设置匹配的 HTTPS 公网地址。');
 const configured = !!config.YUANQI_APP_ID && !!config.YUANQI_APP_KEY && !/^(请|replace-with-)/i.test(config.YUANQI_APP_KEY);
+async function resolveChineseDisease(label) {
+  if (!configured) throw new Error('智能体服务未配置，无法自动转换中文疾病名称。');
+  const prompt = `任务：把下面的中文疾病名称规范化为最适合 PubMed 标题/摘要检索的英文疾病术语。只输出一个英文术语，不要解释，不要加引号。\n中文疾病名称：${label}`;
+  let upstream;
+  try {
+    upstream = await fetch('https://yuanqi.tencent.com/openapi/v1/agent/chat/completions', {
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${config.YUANQI_APP_KEY}`},
+      body:JSON.stringify({assistant_id:config.YUANQI_APP_ID,user_id:'herblab-disease-normalizer',stream:false,messages:[{role:'user',content:[{type:'text',text:prompt}]}]}),
+      signal:AbortSignal.timeout(30000)
+    });
+  } catch (e) { throw new Error(e.name==='TimeoutError'?'疾病名称自动规范化超时。':'无法连接疾病名称规范化服务。'); }
+  let data; try { data=await upstream.json(); } catch { throw new Error('疾病名称规范化服务返回格式无效。'); }
+  if (!upstream.ok) throw new Error('疾病名称自动规范化暂时不可用。');
+  let value=String(data.choices?.[0]?.message?.content||'').trim().replace(/^```(?:text)?\s*/i,'').replace(/\s*```$/,'').trim();
+  value=value.split(/\r?\n/).map(x=>x.trim()).find(Boolean)||'';
+  value=value.replace(/^['"]|['"]$/g,'').replace(/^(English(?: disease)?(?: term)?|英文(?:疾病)?(?:术语|名称))\s*[:：]\s*/i,'').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9 .,'()\/-]{1,99}$/.test(value)) throw new Error('无法可靠识别这个中文疾病名称，请填写对应英文名称。');
+  return value;
+}
+const research = createResearchService({resolveDisease:resolveChineseDisease});
 const allowedHosts = publicMode || proxyMode ? [new URL(publicOrigin).host] : [`127.0.0.1:${port}`, `localhost:${port}`];
 function authenticated(req) {
   if (!publicMode) return true;
