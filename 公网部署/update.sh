@@ -13,7 +13,7 @@ for file in server.cjs literature-import.cjs research.cjs sources.cjs candidate-
   test -f "$update_dir/本地服务/$file"
   node --check "$update_dir/本地服务/$file"
 done
-for file in app.js research-ui.js sources-ui.js; do node --check "$update_dir/演示前端/$file"; done
+for file in app.js research-ui.js sources-ui.js ranking.js ranking-ui.js; do node --check "$update_dir/演示前端/$file"; done
 backup_dir="/opt/herblab-backups/before-update-$(date +%Y%m%d-%H%M%S)-$$"
 sudo install -d -m 700 "$backup_dir"
 sudo cp -a "$app_dir/演示前端" "$app_dir/本地服务" "$backup_dir/"

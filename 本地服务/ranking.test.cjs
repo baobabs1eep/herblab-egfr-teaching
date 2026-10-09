@@ -60,18 +60,21 @@ test('cold ranking can reverse conventional ranking', () => {
   ], {}), { minBase: 0 });
   assert.deepEqual(result.conventional.map(r => r.id), ['high-base', 'low-base-cold']);
   assert.deepEqual(result.cold.map(r => r.id), ['low-base-cold', 'high-base']);
+  assert.deepEqual(result.cold.map(r => r.delta), [1, -1]);
 });
 
-test('missing count is not treated as zero, while explicit zero receives novelty bonus', () => {
+test('missing heat stays conventional but is excluded from cold, and singleton zero has no artificial bonus', () => {
   const missing = ranking.compute(data([candidate('missing-count', { heat: { count: null, query: 'q', source: NODE, date: '2026-09-26' } })]));
   assert.equal(missing.rows[0].heat, null);
   assert.equal(missing.rows[0].novelty, null);
   assert.equal(missing.eligible, 0);
+  assert.equal(missing.conventional.length, 1);
+  assert.deepEqual(missing.rows[0].heatMissing.length > 0, true);
 
   const zero = ranking.compute(data([candidate('zero-count', { heat: { count: 0, query: 'q', source: NODE, date: '2026-09-26' } })]));
-  assert.equal(zero.rows[0].novelty, 1);
-  assert.equal(zero.rows[0].boost, 10);
-  assert.equal(zero.rows[0].cold, zero.rows[0].base + 10);
+  assert.equal(zero.rows[0].novelty, 0);
+  assert.equal(zero.rows[0].boost, 0);
+  assert.equal(zero.rows[0].cold, zero.rows[0].base);
 });
 
 test('filter fail and unknown, plus pending identity, stay out of the queue', () => {
@@ -96,7 +99,8 @@ test('protocol, target, date, and filter policy mismatches exclude candidates', 
   for (const [label, overrides] of fields) {
     const result = ranking.compute(data([candidate(label, overrides)]));
     assert.equal(result.eligible, 0, label);
-    assert.equal(result.rows[0].status, '待补数据', label);
+    assert.equal(result.conventional.length, label === 'date' ? 1 : 0, label);
+    assert.equal(result.rows[0].status, label === 'date' ? '可排序' : '待补数据', label);
   }
 });
 
@@ -124,4 +128,97 @@ test('bonus zero makes conventional and cold order and ranks identical', () => {
   ], {}), { bonus: 0 });
   assert.deepEqual(result.conventional.map(r => r.id), result.cold.map(r => r.id));
   assert.deepEqual(result.conventional.map(r => r.rank), result.cold.map(r => r.rank));
+});
+
+test('explicit match score is used, and invalid target or source does not fall back to docking', () => {
+  const meta = { matchPolicy: 'match-v1' };
+  const result = ranking.compute(data([
+    candidate('explicit', { match: { score: 88, source: NODE, target: 'EGFR-L858R', policy: 'match-v1' } }),
+    candidate('bad-target', { match: { score: 99, source: NODE, target: 'other', policy: 'match-v1' } }),
+    candidate('bad-source', { match: { score: 99, source: '', target: 'EGFR-L858R', policy: 'match-v1' } }),
+  ], meta));
+  assert.equal(result.rows.find(r => r.id === 'explicit').matchMethod, 'provided-score');
+  assert.equal(result.rows.find(r => r.id === 'explicit').base, 88);
+  for (const id of ['bad-target', 'bad-source']) {
+    const row = result.rows.find(r => r.id === id);
+    assert.equal(row.base, null);
+    assert.equal(row.matchEligible, false);
+    assert.equal(row.matchMissing.length > 0, true);
+  }
+});
+
+test('null explicit score remains pending, while complete structured components produce weighted match', () => {
+  const result = ranking.compute(data([
+    candidate('pending', { match: { score: null, source: '', target: 'EGFR-L858R', policy: 'match-v1' } }),
+    candidate('structured', { match: {
+      score: null, source: NODE, target: 'EGFR-L858R', policy: 'match-v1',
+      components: {
+        structure: { value: 80, source: NODE },
+        channel: { value: 60, source: NODE },
+        affinity: { value: 40, source: NODE },
+      },
+    } }),
+  ], { matchPolicy: 'match-v1', matchWeights: [2, 1, 1] }));
+  const pending = result.rows.find(r => r.id === 'pending');
+  const structured = result.rows.find(r => r.id === 'structured');
+  assert.equal(pending.base, null);
+  assert.equal(pending.matchEligible, false);
+  assert.equal(structured.matchMethod, 'structured-components');
+  assert.equal(structured.base, 65);
+  assert.deepEqual(result.matchingWeights, [0.5, 0.25, 0.25]);
+});
+
+test('equal counts produce zero novelty and rare candidate cannot rescue below threshold', () => {
+  const equal = ranking.compute(data([
+    candidate('A', { heat: { count: 2, query: 'q', source: NODE, date: '2026-09-26' } }),
+    candidate('B', { heat: { count: 2, query: 'q', source: NODE, date: '2026-09-26' } }),
+  ]));
+  assert.deepEqual(equal.cold.map(r => r.novelty), [0, 0]);
+  assert.deepEqual(equal.cold.map(r => r.boost), [0, 0]);
+  const threshold = ranking.compute(data([
+    candidate('rare-below', { docking: { score: -7, source: NODE, protocol: 'dock-v1', target: 'EGFR-L858R' }, heat: { count: 0, query: 'q', source: NODE, date: '2026-09-26' } }),
+    candidate('common', { docking: { score: -8, source: NODE, protocol: 'dock-v1', target: 'EGFR-L858R' }, heat: { count: 1000, query: 'q', source: NODE, date: '2026-09-26' } }),
+  ]));
+  assert.equal(threshold.rows.find(r => r.id === 'rare-below').matchEligible, false);
+  assert.equal(threshold.cold.some(r => r.id === 'rare-below'), false);
+});
+
+test('smoothing is finite and changes surprisal ordering without unstable ties', () => {
+  assert.throws(() => ranking.settings({ smoothing: 0 }), /平滑项/);
+  assert.throws(() => ranking.settings({ smoothing: 101 }), /平滑项/);
+  const result = ranking.compute(data([
+    candidate('zero', { heat: { count: 0, query: 'q', source: NODE, date: '2026-09-26' } }),
+    candidate('one', { heat: { count: 1, query: 'q', source: NODE, date: '2026-09-26' } }),
+  ]), { smoothing: 100 });
+  assert.equal(result.reference.smoothing, 100);
+  assert.equal(result.rows.every(r => Number.isFinite(r.surprisal)), true);
+  assert.deepEqual(result.cold.map(r => r.id), ['zero', 'one']);
+});
+
+test('rank movement compares only common heat-known pool', () => {
+  const result = ranking.compute(data([
+    candidate('unknown-first', { docking: { score: -12, source: NODE, protocol: 'dock-v1', target: 'EGFR-L858R' }, heat: { count: null } }),
+    candidate('known'),
+  ]));
+  assert.equal(result.cold[0].firstRankOriginal, 2);
+  assert.equal(result.cold[0].baselineRankInColdPool, 1);
+  assert.equal(result.cold[0].delta, 0);
+});
+
+test('large component weights normalize safely and malformed weights are rejected', () => {
+  const c = candidate('structured', { match: { score: null, source: NODE, target: 'EGFR-L858R', policy: 'match-v1', components: {
+    structure: { value: 80, source: NODE }, channel: { value: 60, source: NODE }, affinity: { value: 40, source: NODE },
+  } } });
+  const result = ranking.compute(data([c], { matchPolicy: 'match-v1', matchWeights: [1e308, 1e308, 1e308] }));
+  assert.equal(result.rows[0].base, 60);
+  assert.throws(() => ranking.compute(data([c], { matchWeights: [1, 0, 1] })), /matchWeights/);
+  assert.throws(() => ranking.compute(data([c], { matchWeights: [1, 1] })), /matchWeights/);
+});
+
+test('surprisal stays finite with tiny positive smoothing and safe integer counts', () => {
+  const result = ranking.compute(data([
+    candidate('rare', { heat: { count: 0, query: 'q', source: NODE, date: '2026-09-26' } }),
+    candidate('popular', { heat: { count: Number.MAX_SAFE_INTEGER, query: 'q', source: NODE, date: '2026-09-26' } }),
+  ]), { smoothing: Number.MIN_VALUE });
+  assert.ok(result.cold.every(r => Number.isFinite(r.cold) && Number.isFinite(r.surprisal)));
 });
