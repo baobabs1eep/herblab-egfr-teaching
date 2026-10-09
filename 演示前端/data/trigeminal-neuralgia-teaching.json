@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "caseId": "trigeminal-neuralgia-teaching-2026-10-09",
+  "disease": {
+    "label": "三叉神经痛",
+    "term": "trigeminal neuralgia"
+  },
+  "source": "课堂精选资料 · PubMed 题录核对",
+  "retrievedAt": "2026-10-09T07:31:25.427Z",
+  "query": "人工精选：临床疾病边界、动物模型与天然产物机制线索；不是实时检索结果或系统综述",
+  "total": 3,
+  "warnings": [
+    "这是一组固定课堂资料，更新日期为 2026-10-09，不代表全部相关研究。题录已核对，中文教学摘要为人工整理，非论文原文全文。",
+    "三叉神经痛的临床诊断与神经损伤所致三叉神经病理性疼痛模型不能直接等同。动物或细胞结果不能外推为临床疗效。",
+    "Liquiritin 是甘草苷；不能与 liquiritigenin（甘草素）混用。候选身份和相关性仍需用户核对，无正式排名、完整 ADMET 或已执行湿实验。",
+    "PubMed 与 Europe PMC 暂不可用时仍可阅读这组资料并基于资料提问；分子数据库身份查询和 AI 问答仍需要各自的在线服务。"
+  ],
+  "records": [
+    {
+      "pmid": "41880679",
+      "title": "Liquiritin attenuates IONI-induced trigeminal neuropathic pain via TLR4/MyD88-dependent modulation of microglial M1-like polarization.",
+      "journal": "International Immunopharmacology",
+      "date": "2026-03-24（在线）；2026-05-15（卷期）",
+      "doi": "10.1016/j.intimp.2026.116554",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/41880679/",
+      "abstract": "【中文教学摘要，非原文】这项研究以眶下神经损伤（IONI）小鼠及 LPS 刺激的 BV2 小胶质细胞为研究对象，考察甘草苷（Liquiritin）与疼痛行为、炎症及 TLR4/MyD88 信号的关系。课堂任务：区分动物模型、细胞机制证据和临床治疗证据；核对身份、对照组及因果推断依据。证据局限：这是损伤诱导的三叉神经病理性疼痛模型，不能直接代表所有经典三叉神经痛患者，也不能据此确认人类疗效或安全性。",
+      "teachingEvidenceType": "动物与细胞实验",
+      "teachingQuestions": [
+        "IONI 模型与经典三叉神经痛有什么差异？",
+        "通路变化是否足以证明直接靶点作用？",
+        "从文献线索到正式候选仍缺哪些数据？"
+      ]
+    },
+    {
+      "pmid": "42174422",
+      "title": "A modified FLIT-B model of trigeminal neuralgia reveals anterior cingulate cortex involvement in anxiety-like behavior in mice.",
+      "journal": "The Journal of Headache and Pain",
+      "date": "2026 May 22",
+      "doi": "10.1186/s10194-026-02394-z",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/42174422/",
+      "abstract": "【中文教学摘要，非原文】研究建立改良 FLIT-B 小鼠三叉神经根压迫模型，观察疼痛相关行为及焦虑样行为，并研究前扣带皮层等脑区的变化。课堂用途：讨论研究模型如何影响结果的解释和后续验证方案。证据局限：小鼠行为与人类主观症状不能直接等同；该论文用于模型研读，并非甘草苷疗效验证。",
+      "teachingEvidenceType": "动物模型研究",
+      "teachingQuestions": [
+        "FLIT-B 与 IONI 模型的研究问题有何不同？",
+        "模型验证与候选药物验证应如何区分？"
+      ]
+    },
+    {
+      "pmid": "30860637",
+      "title": "European Academy of Neurology guideline on trigeminal neuralgia.",
+      "journal": "European Journal of Neurology",
+      "date": "2019-04-08（在线）；2019-06（卷期）",
+      "doi": "10.1111/ene.13950",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/30860637/",
+      "abstract": "【中文教学摘要，非原文】这份 2019 年欧洲神经病学学会指南通过文献审查，讨论三叉神经痛的分类、诊断评估及临床管理。课堂用途：先明确经典、特发性和继发性三叉神经痛的区别，再评估实验模型与临床研究问题的对应关系。证据局限：这是历史指南与疾病背景材料，不是天然产物候选的药效证据，实际临床决策还需核对最新指南与专业评估。",
+      "teachingEvidenceType": "临床指南",
+      "teachingQuestions": [
+        "疾病分类为什么影响文献纳入标准？",
+        "指南推荐与前临床机制线索的证据层级如何区分？"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "name": "liquiritin",
+      "identifier": "",
+      "source": "课堂整理 · PMID 41880679 题名与摘要",
+      "pmids": [
+        "41880679"
+      ],
+      "excerpts": [
+        "候选名称来自论文；身份待核对。中文名称：甘草苷。不能与甘草素 liquiritigenin 混用。"
+      ],
+      "status": "文献线索·待核验"
+    }
+  ],
+  "identityChecks": {
+    "0": {
+      "schemaVersion": 1,
+      "archived": true,
+      "candidate": {
+        "name": "liquiritin",
+        "identifier": "",
+        "source": "课堂整理 · PMID 41880679 题名与摘要",
+        "pmids": [
+          "41880679"
+        ],
+        "excerpts": [
+          "候选名称来自论文；身份待核对。中文名称：甘草苷。不能与甘草素 liquiritigenin 混用。"
+        ],
+        "status": "文献线索·待核验"
+      },
+      "identity": {
+        "pubchem": {
+          "status": "ok",
+          "data": {
+            "name": "liquiritin",
+            "cid": 503737,
+            "formula": "C21H22O9",
+            "molecularWeight": "418.4",
+            "inchiKey": "DEMKZLAVQYISIA-ZRWXNEIDSA-N",
+            "iupacName": "(2S)-7-hydroxy-2-[4-[(2S,3R,4S,5S,6R)-3,4,5-trihydroxy-6-(hydroxymethyl)oxan-2-yl]oxyphenyl]-2,3-dihydrochromen-4-one",
+            "url": "https://pubchem.ncbi.nlm.nih.gov/compound/503737",
+            "retrievedAt": "2026-10-09T07:31:25.425Z",
+            "source": "PubChem",
+            "identityStatus": "needs_review"
+          }
+        },
+        "coconut": {
+          "status": "not_requested"
+        },
+        "chembl": {
+          "status": "not_requested"
+        }
+      },
+      "target": {
+        "status": "not_requested"
+      },
+      "provenance": {
+        "disease": {
+          "label": "三叉神经痛",
+          "term": "trigeminal neuralgia"
+        },
+        "query": "PubChem compound name: liquiritin",
+        "retrievedAt": "2026-10-09T07:31:25.425Z",
+        "checkedAt": "2026-10-09T07:31:25.425Z",
+        "records": [
+          {
+            "pmid": "41880679",
+            "title": "Liquiritin attenuates IONI-induced trigeminal neuropathic pain via TLR4/MyD88-dependent modulation of microglial M1-like polarization.",
+            "url": "https://pubmed.ncbi.nlm.nih.gov/41880679/"
+          }
+        ]
+      },
+      "readiness": {
+        "status": "pending_data",
+        "missing": [
+          "同协议对接",
+          "热度",
+          "过滤规则与性质"
+        ],
+        "canRank": false
+      },
+      "reviewRequired": true
+    }
+  }
+}

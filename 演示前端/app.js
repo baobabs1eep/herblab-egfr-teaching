@@ -46,7 +46,7 @@ function draftFor(key){return state.workspace.drafts[key]||(state.workspace.draf
 function activeDraft(){return state.workspace.activeResearchKey?draftFor(state.workspace.activeResearchKey):state;}
 function currentCandidate(){const ext=externalById(state.selected);if(ext)return {...ext,origin:'research',disease:ext.disease};const c=candidates.find(x=>x.id===state.selected);return c?{...c,origin:'egfr'}:{id:'',name:'尚未选择候选',origin:'research',disease:{label:'研究需求'},source:'尚未核对',snapshot:{records:[]}};}
 function allSelectable(){return [...candidates,...externalList()];}
-function candidateLabel(c){return c.origin==='research'?`${c.name||'未命名疾病'} · ${c.identifier||'无标识'} · ${c.source||'外部检索'}`:`${c.name} · ${c.id}`;}
+function candidateLabel(c){return c.origin==='research'?`${c.name||'未命名疾病'} · ${c.identifier||c.selectedIdentity?.identifier||'无标识'} · ${c.source||'外部检索'}`:`${c.name} · ${c.id}`;}
 function selectResearchCandidate(candidate,snapshot){
   if(!candidate||typeof candidate!=='object')return false;
   const key=stableKey(candidate,snapshot); const old=state.workspace.activeResearchKey;

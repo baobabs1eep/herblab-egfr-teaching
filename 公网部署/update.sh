@@ -9,7 +9,7 @@ test -d "$app_dir/演示前端"
 update_dir=$(mktemp -d /tmp/herblab-update.XXXXXX)
 git clone https://github.com/baobabs1eep/herblab-egfr-teaching.git "$update_dir"
 git -C "$update_dir" checkout --detach "$revision"
-for file in server.cjs research.cjs sources.cjs candidate-check.cjs; do
+for file in server.cjs literature-import.cjs research.cjs sources.cjs candidate-check.cjs; do
   test -f "$update_dir/本地服务/$file"
   node --check "$update_dir/本地服务/$file"
 done
@@ -26,7 +26,7 @@ rollback(){
 trap 'rollback' ERR
 sudo cp -a "$update_dir/演示前端/." "$app_dir/演示前端/"
 sudo chown -R herblab:herblab "$app_dir/演示前端"
-for file in server.cjs research.cjs sources.cjs candidate-check.cjs; do
+for file in server.cjs literature-import.cjs research.cjs sources.cjs candidate-check.cjs; do
   sudo install -o herblab -g herblab -m 644 "$update_dir/本地服务/$file" "$app_dir/本地服务/$file"
 done
 sudo systemctl restart herblab
