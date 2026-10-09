@@ -1,5 +1,14 @@
 'use strict';
 const test = require('node:test'); const assert = require('node:assert/strict'); const { createResearchService, ResearchError } = require('./research.cjs');
+test('NCBI abuse redirect is reported and successful fallback remains usable', async () => {
+  let parsedBlock=false;
+  const blocked={ok:true,status:200,url:'https://misuse.ncbi.nlm.nih.gov/error/abuse.shtml',json:async()=>{parsedBlock=true;throw new Error('HTML');}};
+  const s=createResearchService({minIntervalMs:0,fetchImpl:async url=>String(url).includes('/esearch.fcgi')?blocked:{ok:true,status:200,json:async()=>({hitCount:0,resultList:{result:[]}})}});
+  const r=await s.search({disease:'三叉神经痛'});
+  assert.equal(parsedBlock,false);assert.equal(r.provider,'Europe PMC');assert.match(r.warnings[0],/NCBI 已限制/);
+  const failed=createResearchService({minIntervalMs:0,fetchImpl:async url=>String(url).includes('/esearch.fcgi')?blocked:{ok:false,status:403}});
+  await assert.rejects(()=>failed.search({disease:'三叉神经痛'}),e=>/NCBI 已限制/.test(e.message)&&/Europe PMC/.test(e.message)&&/不代表没有/.test(e.message));
+});
 function mockFetch(routes, calls = []) { return async (url) => { calls.push(String(url)); const route = routes.find(x => (x[0]==='esearch' ? String(url).includes('/esearch.fcgi') : String(url).includes(x[0]))); if (!route) return { ok: false, status: 500, json: async () => ({}) }; const value = route[1]; return { ok: true, status: 200, json: async () => typeof value === 'function' ? value(url) : value, text: async () => typeof value === 'function' ? value(url) : value }; }; }
 test('aliases are translated and records retain provenance', async () => { const calls=[]; const fetchImpl=mockFetch([['esearch', {esearchresult:{count:'1',idlist:['7']}}], ['esummary',{result:{'7':{title:'Study',source:'J',pubdate:'2020',articleids:[{idtype:'doi',value:'10.x'}]}}}], ['efetch','<PubmedArticle><MedlineCitation><PMID>7</PMID></MedlineCitation><Article><Abstract><AbstractText>Plants &amp; health</AbstractText></Abstract></Article></PubmedArticle>'], ['pubtator', {documents:[]}]],calls); const r=await createResearchService({fetchImpl,minIntervalMs:0}).search({disease:'三叉神经痛'}); assert.equal(r.disease.term,'trigeminal neuralgia'); assert.equal(r.records[0].abstract,'Plants & health'); assert.match(r.records[0].url,/pubmed.ncbi.nlm.nih.gov/); assert.equal(calls.length,4); });
 test('unknown Chinese disease uses configured normalizer', async () => { const seen=[]; const s=createResearchService({fetchImpl:mockFetch([['esearch',{esearchresult:{count:'0',idlist:[]}}]]),minIntervalMs:0,resolveDisease:async label=>{seen.push(label);return 'rheumatoid arthritis';}}); const r=await s.search({disease:'类风湿关节炎'}); assert.deepEqual(seen,['类风湿关节炎']); assert.equal(r.disease.label,'类风湿关节炎'); assert.equal(r.disease.term,'rheumatoid arthritis'); assert.equal(r.disease.normalizedBy,'AI'); assert.match(r.query,/rheumatoid arthritis/); });

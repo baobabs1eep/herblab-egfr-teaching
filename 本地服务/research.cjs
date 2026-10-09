@@ -45,8 +45,15 @@ function createResearchService(options = {}) {
     const run = queue.then(async () => { const wait = Math.max(0, minIntervalMs - (Date.now() - lastRequest)); if (wait) await new Promise(r => setTimeout(r, wait)); lastRequest = Date.now();
       let last; for (let attempt = 0; attempt < 3; attempt++) { const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), timeoutMs); try { const res = await fetchImpl(url, { ...init, signal: ctl.signal }); if (res.ok || (res.status < 400 && res.status !== 0)) return res; last = new ResearchError(res.status===404?'未找到对应数据库记录。':`外部数据库请求失败（${res.status}）`, res.status===404?404:502); if (![429, 500, 502, 503, 504].includes(res.status) || attempt === 2) throw last; } catch (e) { last = e.name === 'AbortError' ? new ResearchError('Upstream request timed out', 504) : e; if (attempt === 2 || !(last instanceof ResearchError && /(429|5\d\d)/.test(last.message))) throw last; } finally { clearTimeout(timer); } await new Promise(r => setTimeout(r, Math.max(minIntervalMs, 500) * (attempt + 1))); } throw last; }); queue = run.catch(() => {}); return run;
   }
-  async function bodyJson(url, init) { const r = await pacedFetch(url, init); try { return await r.json(); } catch { throw new ResearchError('上游返回格式无效，请稍后重试。'); } }
-  async function bodyText(url) { const r = await pacedFetch(url); return r.text(); }
+  function checkAccess(response) {
+    if (response.url && new URL(response.url).hostname === 'misuse.ncbi.nlm.nih.gov') {
+      const error = new ResearchError('NCBI 已限制服务器的 PubMed 访问，需要登记工具与联系邮箱并申请恢复。', 503);
+      error.code = 'NCBI_BLOCKED';
+      throw error;
+    }
+  }
+  async function bodyJson(url, init) { const r = await pacedFetch(url, init); checkAccess(r); try { return await r.json(); } catch { throw new ResearchError('上游返回格式无效，请稍后重试。'); } }
+  async function bodyText(url) { const r = await pacedFetch(url); checkAccess(r); return r.text(); }
   async function search(input = {}) {
     let disease = diseaseInput(input.disease);
     if (disease.needsResolution) {
@@ -68,7 +75,11 @@ function createResearchService(options = {}) {
         ids = es.esearchresult.idlist.map(String); base.total = Number(es.esearchresult.count);
       } catch (primaryError) {
         const epmcQuery = `SRC:MED AND TITLE_ABS:"${disease.term}"${target ? ` AND TITLE_ABS:"${target}"` : ''}${compound ? ` AND TITLE_ABS:"${compound}"` : ' AND (TITLE_ABS:"natural product" OR TITLE_ABS:herbal OR TITLE_ABS:flavonoid OR TITLE_ABS:phytochemical OR TITLE_ABS:"plant extract" OR TITLE_ABS:"traditional Chinese medicine")'} sort_date:y`;
-        const epmc = await bodyJson(`${EUROPEPMC}?query=${encodeURIComponent(epmcQuery)}&resultType=core&format=json&pageSize=${limit}`);
+        let epmc;
+        try { epmc = await bodyJson(`${EUROPEPMC}?query=${encodeURIComponent(epmcQuery)}&resultType=core&format=json&pageSize=${limit}`); }
+        catch (fallbackError) {
+          throw new ResearchError(`文献检索暂不可用。PubMed：${primaryError.message} Europe PMC：${fallbackError.message} 请稍后重试；本次未返回文献，不代表没有相关研究。`, fallbackError.status || 502);
+        }
         if (!epmc || !epmc.resultList || !Array.isArray(epmc.resultList.result) || !Number.isFinite(Number(epmc.hitCount))) throw new ResearchError('Europe PMC 返回格式无效，请稍后重试。');
         base.source = 'Europe PMC（PubMed记录）'; base.provider = 'Europe PMC'; base.query = epmcQuery; base.total = Number(epmc.hitCount); base.warnings.push(`PubMed 不可用，已切换 Europe PMC：${primaryError.message}`);
         const rows = epmc.resultList.result;
