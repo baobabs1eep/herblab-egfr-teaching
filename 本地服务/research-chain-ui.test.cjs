@@ -67,7 +67,7 @@ test('valid manual file stages without fetch until confirmation',async()=>{
 test('ranking template keeps missing match and heat data null and is offered as a manual import',async()=>{
   const f=async(url)=>String(url).includes('/api/research')?response({researchId:'r-template',disease:{label:'偏头痛'},records:[{pmid:'123'}],query:'migraine',candidates:[{name:'候选甲',identifier:'machine-1',pmids:['123']}] }):response({});
   const {context,listeners}=boot(f); listeners.click({target:{closest:s=>s==='#researchSearch'?{}:null}}); await new Promise(r=>setImmediate(r));
-  assert.match(context.ResearchUI.candidatePanel(),/导出本轮双排名待补模板/);
+  assert.match(context.ResearchUI.candidatePanel(),/导出本轮匹配排名待补模板/);
   const data=context.ResearchUI.rankingTemplate();
   assert.match(data.metadata.version,/^research-template-\d{4}-\d{2}-\d{2}$/);
   assert.equal(data.metadata.target,'研究主题：偏头痛');
@@ -79,6 +79,6 @@ test('ranking template keeps missing match and heat data null and is offered as 
   assert.equal(data.candidates[0].match.components.structure.value,null);
   assert.match(data.candidates[0].evidence,/PMID 123/); assert.match(data.candidates[0].evidence,/无报道不等于不匹配/);
   const result=require('../演示前端/ranking.js').compute(data);
-  assert.equal(result.conventional.length,0); assert.equal(result.cold.length,0);
+  assert.equal(result.conventional.length,0); assert.equal(result.conventionalEligible,0);
   assert.equal(result.rows[0].base,null); assert.equal(result.rows[0].heat,null);
 });

@@ -63,6 +63,8 @@ test('loopback proxy mode accepts the public host and rejects a foreign origin',
     assert.equal(await request(port,'/',{Host:'other.example.test'}),403);
     assert.equal(await request(port,'/api/chat',{Host:'demo.example.test',Origin:'https://other.example.test','Content-Type':'application/json'},'POST','{}'),403);
     assert.equal(await request(port,'/api/candidate-check',{Host:'demo.example.test',Origin:'https://other.example.test','Content-Type':'application/json'},'POST','{}'),403);
+    assert.equal(await request(port,'/api/structure-screen',{Host:'demo.example.test',Origin:'https://other.example.test','Content-Type':'application/json'},'POST','{}'),403);
+    assert.equal(await request(port,'/api/structure-screen',{Host:'demo.example.test','Content-Type':'application/json'},'POST','{}'),400);
     assert.equal(await request(port,'/api/candidate-check',{Host:'demo.example.test','Content-Type':'application/json'},'POST','{"research_id":"unknown","candidate_index":0}'),409);
     assert.equal(await request(port,'/api/candidate-check',{Host:'demo.example.test','Content-Type':'application/json'},'POST','{'),400);
     assert.equal(await request(port,'/api/teaching-case',{Host:'demo.example.test'}),200);

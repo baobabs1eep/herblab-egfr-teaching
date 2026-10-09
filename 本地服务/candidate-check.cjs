@@ -80,7 +80,7 @@ function createCandidateChecker({ research, sources } = {}) {
       },
       readiness: {
         status: 'pending_data',
-        missing: ['同协议对接', '热度', '过滤规则与性质'],
+        missing: ['独立结构、靶点／通道与亲和力匹配计算', '过滤规则与性质'],
         canRank: false,
       },
       reviewRequired: true,

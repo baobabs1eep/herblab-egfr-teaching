@@ -9,6 +9,7 @@ const {createSourceService} = require('./sources.cjs');
 const {createCandidateChecker} = require('./candidate-check.cjs');
 const {validateResearchImport, loadTeachingCase} = require('./literature-import.cjs');
 const structuredSources = createSourceService();
+const structureScreen = require('./structure-screen.cjs').createStructureScreen();
 const researchSessions = new Map();
 let researchActive = 0;
 const config = {};
@@ -68,7 +69,7 @@ const publicHost = config.PUBLIC_HOST || '';
 const root = path.resolve(__dirname, '../演示前端');
 const teachingCasePath = path.join(root, 'data', 'trigeminal-neuralgia-teaching.json');
 const assets = new Map([['/', ['index.html','text/html']], ['/index.html',['index.html','text/html']], ['/app.js',['app.js','text/javascript']], ['/style.css',['style.css','text/css']], ['/lucide.min.js',['lucide.min.js','text/javascript']], ['/quercetin.png',['quercetin.png','image/png']]]);
-for (const file of ['ranking.js','ranking-data.js','ranking-ui.js','research-ui.js','sources-ui.js']) assets.set('/'+file,[file,'text/javascript']);
+for (const file of ['ranking.js','ranking-data.js','ranking-ui.js','research-ui.js','sources-ui.js','structure-ui.js']) assets.set('/'+file,[file,'text/javascript']);
 assets.set('/ranking.css',['ranking.css','text/css']);
 assets.set('/research.css',['research.css','text/css']);
 let active = 0;
@@ -122,7 +123,7 @@ const server = http.createServer(async (req, res) => {
     {name:'HERB',status:'manual',description:'官方网页查阅；尚未取得并导入获准使用的数据导出文件。',url:'http://herb.ac.cn/v2/'},
     {name:'TCMSP',status:'manual',description:'官方网页查阅；未发现公开接口，尚未导入授权导出数据。',url:'https://old.tcmsp-e.com/tcmsp.php'}
   ]});
-  if (req.method === 'POST' && ['/api/research','/api/research-import','/api/compound','/api/natural-product','/api/target','/api/chembl-molecule','/api/bioactivity','/api/article','/api/candidate-check'].includes(route)) {
+  if (req.method === 'POST' && ['/api/research','/api/research-import','/api/compound','/api/natural-product','/api/target','/api/chembl-molecule','/api/bioactivity','/api/article','/api/candidate-check','/api/structure-screen'].includes(route)) {
     const expected = publicMode || proxyMode ? publicOrigin : `http://${req.headers.host}`;
     if (req.headers.origin && req.headers.origin!==expected) return json(res,403,{error:'请从研学页面发起检索。'});
     if (!(req.headers['content-type']||'').startsWith('application/json')) return json(res,415,{error:'请求格式应为 JSON。'});
@@ -153,7 +154,8 @@ const server = http.createServer(async (req, res) => {
         '/api/target':()=>structuredSources.target(input.query),
         '/api/chembl-molecule':()=>structuredSources.molecule(input.name),
         '/api/bioactivity':()=>structuredSources.bioactivity(input.moleculeId),
-        '/api/article':()=>structuredSources.article(input.pmid)
+        '/api/article':()=>structuredSources.article(input.pmid),
+        '/api/structure-screen':()=>structureScreen.screen(input)
       };
       const result = await handlers[route]();
       if (route==='/api/research') {
