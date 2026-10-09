@@ -5,6 +5,8 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const {randomUUID} = crypto;
 const {createResearchService} = require('./research.cjs');
+const {createSourceService} = require('./sources.cjs');
+const structuredSources = createSourceService();
 const researchSessions = new Map();
 let researchActive = 0;
 const config = {};
@@ -62,7 +64,7 @@ function authenticated(req) {
 const publicHost = config.PUBLIC_HOST || '';
 const root = path.resolve(__dirname, '../演示前端');
 const assets = new Map([['/', ['index.html','text/html']], ['/index.html',['index.html','text/html']], ['/app.js',['app.js','text/javascript']], ['/style.css',['style.css','text/css']], ['/lucide.min.js',['lucide.min.js','text/javascript']], ['/quercetin.png',['quercetin.png','image/png']]]);
-for (const file of ['ranking.js','ranking-data.js','ranking-ui.js','research-ui.js']) assets.set('/'+file,[file,'text/javascript']);
+for (const file of ['ranking.js','ranking-data.js','ranking-ui.js','research-ui.js','sources-ui.js']) assets.set('/'+file,[file,'text/javascript']);
 assets.set('/ranking.css',['ranking.css','text/css']);
 assets.set('/research.css',['research.css','text/css']);
 let active = 0;
@@ -96,10 +98,12 @@ const server = http.createServer(async (req, res) => {
     {name:'PubTator3',status:'upstream_dependent',description:'识别检索文献中的化学实体；机器识别尚需核对身份、用途及相关性。',url:'https://www.ncbi.nlm.nih.gov/research/pubtator3/'},
     {name:'PubChem',status:'upstream_dependent',description:'按分子名称查询 CID、分子式、分子量与 InChIKey。',url:'https://pubchem.ncbi.nlm.nih.gov/'},
     {name:'COCONUT',status:'live',description:'天然产物名称与结构查询；并非所有记录均为中药成分。',url:'https://coconut.naturalproducts.net/'},
+    {name:'UniProt',status:'live',description:'查询人工审阅的人类靶点记录；基因名匹配需要确认，不推断疾病关联。',url:'https://www.uniprot.org/'},
+    {name:'ChEMBL',status:'live',description:'查询化合物身份及实验活性；不同实验条件与单位不能直接混合排名。',url:'https://www.ebi.ac.uk/chembl/'},
     {name:'HERB',status:'manual',description:'官方网页查阅；尚未取得并导入获准使用的数据导出文件。',url:'http://herb.ac.cn/v2/'},
     {name:'TCMSP',status:'manual',description:'官方网页查阅；未发现公开接口，尚未导入授权导出数据。',url:'https://old.tcmsp-e.com/tcmsp.php'}
   ]});
-  if (req.method === 'POST' && ['/api/research','/api/compound','/api/natural-product'].includes(route)) {
+  if (req.method === 'POST' && ['/api/research','/api/compound','/api/natural-product','/api/target','/api/chembl-molecule','/api/bioactivity','/api/article'].includes(route)) {
     const expected = publicMode || proxyMode ? publicOrigin : `http://${req.headers.host}`;
     if (req.headers.origin && req.headers.origin!==expected) return json(res,403,{error:'请从研学页面发起检索。'});
     if (!(req.headers['content-type']||'').startsWith('application/json')) return json(res,415,{error:'请求格式应为 JSON。'});
@@ -110,7 +114,16 @@ const server = http.createServer(async (req, res) => {
     if ((publicMode || proxyMode)&&rateLimited(req)) return json(res,429,{error:'检索较多，请稍后重试。'});
     researchActive++;
     try {
-      const result = route==='/api/research' ? await research.search(input) : route==='/api/compound' ? await research.compound(input.name) : await research.naturalProduct(input.name);
+      const handlers = {
+        '/api/research':()=>research.search(input),
+        '/api/compound':()=>research.compound(input.name),
+        '/api/natural-product':()=>research.naturalProduct(input.name),
+        '/api/target':()=>structuredSources.target(input.query),
+        '/api/chembl-molecule':()=>structuredSources.molecule(input.name),
+        '/api/bioactivity':()=>structuredSources.bioactivity(input.moleculeId),
+        '/api/article':()=>structuredSources.article(input.pmid)
+      };
+      const result = await handlers[route]();
       if (route==='/api/research') {
         const now=Date.now();
         for (const [key,value] of researchSessions) if (now-value.savedAt>3600000) researchSessions.delete(key);
