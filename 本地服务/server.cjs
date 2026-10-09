@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const {randomUUID} = crypto;
 const {createResearchService} = require('./research.cjs');
 const {createSourceService} = require('./sources.cjs');
+const {createCandidateChecker} = require('./candidate-check.cjs');
 const structuredSources = createSourceService();
 const researchSessions = new Map();
 let researchActive = 0;
@@ -50,6 +51,7 @@ async function resolveChineseDisease(label) {
   return value;
 }
 const research = createResearchService({resolveDisease:resolveChineseDisease});
+const candidateChecker = createCandidateChecker({research,sources:structuredSources});
 const allowedHosts = publicMode || proxyMode ? [new URL(publicOrigin).host] : [`127.0.0.1:${port}`, `localhost:${port}`];
 function authenticated(req) {
   if (!publicMode) return true;
@@ -103,7 +105,7 @@ const server = http.createServer(async (req, res) => {
     {name:'HERB',status:'manual',description:'官方网页查阅；尚未取得并导入获准使用的数据导出文件。',url:'http://herb.ac.cn/v2/'},
     {name:'TCMSP',status:'manual',description:'官方网页查阅；未发现公开接口，尚未导入授权导出数据。',url:'https://old.tcmsp-e.com/tcmsp.php'}
   ]});
-  if (req.method === 'POST' && ['/api/research','/api/compound','/api/natural-product','/api/target','/api/chembl-molecule','/api/bioactivity','/api/article'].includes(route)) {
+  if (req.method === 'POST' && ['/api/research','/api/compound','/api/natural-product','/api/target','/api/chembl-molecule','/api/bioactivity','/api/article','/api/candidate-check'].includes(route)) {
     const expected = publicMode || proxyMode ? publicOrigin : `http://${req.headers.host}`;
     if (req.headers.origin && req.headers.origin!==expected) return json(res,403,{error:'请从研学页面发起检索。'});
     if (!(req.headers['content-type']||'').startsWith('application/json')) return json(res,415,{error:'请求格式应为 JSON。'});
@@ -114,6 +116,14 @@ const server = http.createServer(async (req, res) => {
     if ((publicMode || proxyMode)&&rateLimited(req)) return json(res,429,{error:'检索较多，请稍后重试。'});
     researchActive++;
     try {
+      if (route==='/api/candidate-check') {
+        const saved=typeof input.research_id==='string'&&researchSessions.get(input.research_id);
+        if (!saved||Date.now()-saved.savedAt>3600000) return json(res,409,{error:'本轮检索记录已过期，请重新检索后核对。'});
+        const i=input.candidate_index;
+        if (!Number.isInteger(i)||i<0||i>=saved.data.candidates.length) return json(res,400,{error:'请选择本轮已有的候选线索。'});
+        const data=saved.data,candidate=data.candidates[i];
+        return json(res,200,await candidateChecker.check({candidate,records:data.records.filter(r=>(candidate.pmids||[]).includes(r.pmid)),target:data.target,disease:data.disease,query:data.query,retrievedAt:data.retrievedAt}));
+      }
       const handlers = {
         '/api/research':()=>research.search(input),
         '/api/compound':()=>research.compound(input.name),
@@ -129,7 +139,7 @@ const server = http.createServer(async (req, res) => {
         for (const [key,value] of researchSessions) if (now-value.savedAt>3600000) researchSessions.delete(key);
         while(researchSessions.size>=100) researchSessions.delete(researchSessions.keys().next().value);
         const researchId=randomUUID();
-        researchSessions.set(researchId,{savedAt:now,data:result});
+        researchSessions.set(researchId,{savedAt:now,data:{...result,target:input.target||''}});
         return json(res,200,{...result,researchId});
       }
       return json(res,200,result);
