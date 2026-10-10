@@ -101,7 +101,7 @@ function normalize(input, { teaching = false } = {}) {
   if (!plain(input.disease)) throw new LiteratureImportError('disease 格式不正确。');
   rejectUnknown(input.disease, diseaseKeys, 'disease');
   const disease = { label: text(input.disease.label, 'disease.label', 200, true), term: text(input.disease.term, 'disease.term', 200, true) };
-  if (!Array.isArray(input.records) || input.records.length > 8) throw new LiteratureImportError('records 数量必须为 0 至 8。');
+  if (!Array.isArray(input.records) || input.records.length > 50) throw new LiteratureImportError('records 数量必须为 0 至 50。');
   const seen = new Set();
   const records = input.records.map(x => cleanRecord(x, seen, teaching));
   if (!Array.isArray(input.candidates) || input.candidates.length > 20) throw new LiteratureImportError('candidates 数量必须为 0 至 20。');

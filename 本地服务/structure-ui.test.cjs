@@ -8,6 +8,11 @@ test('database-only pool imports without papers, but cannot invent complete matc
  const result=require('../演示前端/ranking.js').compute(data);assert.equal(result.conventionalEligible,0);
  assert.match(c.StructureUI.panel(),/不要求已有疾病文献/);assert.doesNotMatch(c.StructureUI.panel(),/惊奇度/);
 });
+test('imported mechanism dimensions remain visible without fabricated values',()=>{
+ const {c}=boot({pool:[{name:'candidate-a',source:'TCMSP',smiles:'CC',target:'SCN9A',affinity:'7.2',admet:'oral bioavailability 42',bbb:'unknown',toxicity:'pending',dimensionSource:'licensed export v1'}]});
+ const html=c.StructureUI.panel();assert.match(html,/模式二候选单体/);assert.match(html,/candidate-a/);assert.match(html,/机制与性质 5\/5/);assert.match(html,/licensed export v1/);
+ const parsed=c.StructureUI.parsePool({records:[{name:'candidate-b',target:'TRPV1',admet:61,dimensionSource:'source record'}]});assert.equal(parsed[0].target,'TRPV1');assert.equal(parsed[0].admet,61);assert.equal(parsed[0].bbb,null);
+});
 test('structure action submits only batch names reference and target, with no literature request',async()=>{
  const calls=[];const {handlers}=boot({names:'candidate',reference:'reference',accession:'P00533',pool:[{name:'extra'}]},async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return {ok:true,json:async()=>({reference:{cid:1},candidates:[]})}});
  await handlers.click({target:{closest:()=>({id:'structureRun'})}});assert.equal(calls.length,1);assert.equal(calls[0].url,'/api/structure-screen');assert.deepEqual(calls[0].body,{names:['candidate'],reference:'reference',accession:'P00533'});
