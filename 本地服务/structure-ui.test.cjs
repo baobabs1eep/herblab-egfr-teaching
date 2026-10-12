@@ -4,8 +4,8 @@ function boot(saved={},fetch=async()=>{throw new Error('unexpected fetch')}){con
 test('database-only pool imports without papers, but cannot invent complete matching',()=>{
  const {c}=boot({accession:'P00533',result:{reference:{cid:1},candidates:[{name:'unreported',identity:{sourceURL:'https://pubchem.ncbi.nlm.nih.gov/compound/2'},structure:{status:'computed',score:60,method:'Tanimoto',referenceCID:1},binding:{status:'pending',total:null,records:[]}}]}});
  const pool=c.StructureUI.parsePool({provenance:{source:'HERB'},records:[{name:'unreported',smiles:'CC'}]});assert.equal(pool.length,1);assert.equal(pool[0].source,'HERB');
- const data=c.StructureUI.template();assert.equal(data.candidates[0].match.components.structure.value,60);assert.equal(data.candidates[0].match.components.affinity.value,null);assert.equal(data.candidates[0].match.components.channel.value,null);
- const result=require('../演示前端/ranking.js').compute(data);assert.equal(result.conventionalEligible,0);
+ const data=c.StructureUI.template();assert.equal(data.candidates[0].dimensions.structure.score,60);assert.equal(data.candidates[0].dimensions.admet,null);assert.equal(data.candidates[0].dimensions.bbb,null);
+ assert.equal(data.mode,'independent-dimensions');assert.equal(data.candidates[0].totalScore,undefined);
  assert.match(c.StructureUI.panel(),/不要求已有疾病文献/);assert.doesNotMatch(c.StructureUI.panel(),/惊奇度/);
 });
 test('structure action submits only batch names reference and target, with no literature request',async()=>{

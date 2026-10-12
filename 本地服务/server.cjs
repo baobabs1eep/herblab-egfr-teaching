@@ -69,7 +69,7 @@ const publicHost = config.PUBLIC_HOST || '';
 const root = path.resolve(__dirname, '../演示前端');
 const teachingCasePath = path.join(root, 'data', 'trigeminal-neuralgia-teaching.json');
 const assets = new Map([['/', ['index.html','text/html']], ['/index.html',['index.html','text/html']], ['/app.js',['app.js','text/javascript']], ['/style.css',['style.css','text/css']], ['/lucide.min.js',['lucide.min.js','text/javascript']], ['/quercetin.png',['quercetin.png','image/png']]]);
-for (const file of ['ranking.js','ranking-data.js','ranking-ui.js','research-ui.js','sources-ui.js','structure-ui.js']) assets.set('/'+file,[file,'text/javascript']);
+for (const file of ['ranking.js','ranking-data.js','ranking-ui.js','evidence-ranking.js','teaching-candidates.js','research-ui.js','sources-ui.js','structure-ui.js']) assets.set('/'+file,[file,'text/javascript']);
 assets.set('/ranking.css',['ranking.css','text/css']);
 assets.set('/research.css',['research.css','text/css']);
 let active = 0;
