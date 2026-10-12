@@ -43,7 +43,7 @@ function createResearchService(options = {}) {
   const cache = new Map(), inflight = new Map(); let lastRequest = 0, queue = Promise.resolve();
   async function pacedFetch(url, init = {}) {
     const run = queue.then(async () => { const wait = Math.max(0, minIntervalMs - (Date.now() - lastRequest)); if (wait) await new Promise(r => setTimeout(r, wait)); lastRequest = Date.now();
-      let last; for (let attempt = 0; attempt < 3; attempt++) { const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), timeoutMs); try { const res = await fetchImpl(url, { ...init, signal: ctl.signal }); if (res.ok || (res.status < 400 && res.status !== 0)) return res; last = new ResearchError(res.status===404?'未找到对应数据库记录。':`外部数据库请求失败（${res.status}）`, res.status===404?404:502); if (![429, 500, 502, 503, 504].includes(res.status) || attempt === 2) throw last; } catch (e) { last = e.name === 'AbortError' ? new ResearchError('Upstream request timed out', 504) : e; if (attempt === 2 || !(last instanceof ResearchError && /(429|5\d\d)/.test(last.message))) throw last; } finally { clearTimeout(timer); } await new Promise(r => setTimeout(r, Math.max(minIntervalMs, 500) * (attempt + 1))); } throw last; }); queue = run.catch(() => {}); return run;
+      let last; for (let attempt = 0; attempt < 3; attempt++) { const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), timeoutMs); try { const res = await fetchImpl(url, { ...init, signal: ctl.signal }); if (res.ok || (res.status < 400 && res.status !== 0)) return res; last = new ResearchError(res.status===404?'未找到对应数据库记录。':`外部数据库请求失败（${res.status}）`, res.status===404?404:502); if (![429, 500, 502, 503, 504].includes(res.status) || attempt === 2) throw last; } catch (e) { last = e.name === 'AbortError' ? new ResearchError('上游数据库连接超时。', 504) : e; const retryable = last instanceof ResearchError ? [429, 500, 502, 503, 504].includes(last.status) : last?.name === 'TypeError'; if (attempt === 2 || !retryable) throw last; } finally { clearTimeout(timer); } await new Promise(r => setTimeout(r, Math.max(minIntervalMs, 500) * (attempt + 1))); } throw last; }); queue = run.catch(() => {}); return run;
   }
   function checkAccess(response) {
     if (response.url && new URL(response.url).hostname === 'misuse.ncbi.nlm.nih.gov') {
@@ -65,24 +65,34 @@ function createResearchService(options = {}) {
       disease = { label: disease.label, term, normalizedBy: 'AI' };
     }
     const target = normalizeInput(input.target, 'target', 100), compound = normalizeInput(input.compound, 'compound', 120);
-    const limit = Math.max(1, Math.min(8, Number.isFinite(Number(input.limit)) ? Number(input.limit) : 8));
-    const query = [`("${disease.term}"[Title/Abstract])`]; if (!compound) query.push('("natural product" OR herbal OR flavonoid OR phytochemical OR "plant extract" OR "traditional Chinese medicine")[Title/Abstract]'); if (target) query.push(`("${target}"[Title/Abstract])`); if (compound) query.push(`("${compound}"[Title/Abstract])`); const queryText = query.join(' AND ');
-    const key = JSON.stringify([disease.term, target, compound, limit]); const old = cache.get(key); if (old && old.expires > Date.now()) return { ...old.value, cached: true }; if (inflight.has(key)) return inflight.get(key);
-    const work = (async () => { const warnings = []; const base = { disease, query: queryText, total: 0, retrievedAt: new Date().toISOString(), records: [], candidates: [], warnings, source: 'PubMed', cached: false };
+    const limit = Math.max(1, Math.min(50, Number.isFinite(Number(input.limit)) ? Number(input.limit) : 20));
+    const offset = Math.max(0, Math.min(1000, Number.isFinite(Number(input.offset)) ? Math.floor(Number(input.offset)) : 0));
+    const sort = input.sort === 'relevance' ? 'relevance' : 'date';
+    const currentYear = new Date().getUTCFullYear();
+    const fromYear = Number.isInteger(Number(input.fromYear)) && Number(input.fromYear) >= 1800 && Number(input.fromYear) <= currentYear ? Number(input.fromYear) : null;
+    const toYear = Number.isInteger(Number(input.toYear)) && Number(input.toYear) >= 1800 && Number(input.toYear) <= currentYear ? Number(input.toYear) : null;
+    if (fromYear && toYear && fromYear > toYear) throw new ResearchError('起始年份不能晚于结束年份。', 400);
+    const scope = input.scope === 'all' ? 'all' : 'natural-products';
+    const query = [`("${disease.term}"[Title/Abstract])`]; if (scope !== 'all' && !compound) query.push('("natural product" OR herbal OR flavonoid OR phytochemical OR "plant extract" OR "traditional Chinese medicine")[Title/Abstract]'); if (target) query.push(`("${target}"[Title/Abstract])`); if (compound) query.push(`("${compound}"[Title/Abstract])`); const queryText = query.join(' AND ');
+    const key = JSON.stringify([disease.term, target, compound, scope, limit, offset, sort, fromYear, toYear]); const old = cache.get(key); if (old && old.expires > Date.now()) return { ...old.value, cached: true }; if (inflight.has(key)) return inflight.get(key);
+    const work = (async () => { const warnings = []; const base = { disease, scope, query: queryText, total: 0, offset, nextOffset: offset + limit, pageSize: limit, sort, fromYear, toYear, hasMore: false, retrievedAt: new Date().toISOString(), records: [], candidates: [], warnings, source: 'PubMed', cached: false };
       let es; let ids; try {
-        es = await bodyJson(`${PUBMED}esearch.fcgi?tool=herblab&db=pubmed&retmode=json&retmax=${limit}&term=${encodeURIComponent(queryText)}`);
+        const dateParams = `${fromYear ? `&mindate=${fromYear}/01/01` : ''}${toYear ? `&maxdate=${toYear}/12/31` : ''}${fromYear || toYear ? '&datetype=pdat' : ''}`;
+        es = await bodyJson(`${PUBMED}esearch.fcgi?tool=herblab&db=pubmed&retmode=json&retmax=${limit}&retstart=${offset}&sort=${sort === 'date' ? 'pub+date' : 'relevance'}${dateParams}&term=${encodeURIComponent(queryText)}`);
         if (!es || !es.esearchresult || !Array.isArray(es.esearchresult.idlist) || !Number.isFinite(Number(es.esearchresult.count))) throw new ResearchError('PubMed 返回格式无效，请稍后重试。');
-        ids = es.esearchresult.idlist.map(String); base.total = Number(es.esearchresult.count);
+        ids = es.esearchresult.idlist.map(String); base.total = Number(es.esearchresult.count); base.hasMore = offset + ids.length < base.total;
       } catch (primaryError) {
-        const epmcQuery = `SRC:MED AND TITLE_ABS:"${disease.term}"${target ? ` AND TITLE_ABS:"${target}"` : ''}${compound ? ` AND TITLE_ABS:"${compound}"` : ' AND (TITLE_ABS:"natural product" OR TITLE_ABS:herbal OR TITLE_ABS:flavonoid OR TITLE_ABS:phytochemical OR TITLE_ABS:"plant extract" OR TITLE_ABS:"traditional Chinese medicine")'} sort_date:y`;
+        const dateQuery = fromYear || toYear ? ` AND FIRST_PDATE:[${fromYear || 1800}-01-01 TO ${toYear || currentYear}-12-31]` : '';
+        const epmcQuery = `SRC:MED AND TITLE_ABS:"${disease.term}"${target ? ` AND TITLE_ABS:"${target}"` : ''}${compound ? ` AND TITLE_ABS:"${compound}"` : scope === 'all' ? '' : ' AND (TITLE_ABS:"natural product" OR TITLE_ABS:herbal OR TITLE_ABS:flavonoid OR TITLE_ABS:phytochemical OR TITLE_ABS:"plant extract" OR TITLE_ABS:"traditional Chinese medicine")'}${dateQuery}${sort === 'date' ? ' sort_date:y' : ''}`;
         let epmc;
-        try { epmc = await bodyJson(`${EUROPEPMC}?query=${encodeURIComponent(epmcQuery)}&resultType=core&format=json&pageSize=${limit}`); }
+        try { epmc = await bodyJson(`${EUROPEPMC}?query=${encodeURIComponent(epmcQuery)}&resultType=core&format=json&pageSize=${limit}&page=${Math.floor(offset / limit) + 1}`); }
         catch (fallbackError) {
           throw new ResearchError(`文献检索暂不可用。PubMed：${primaryError.message} Europe PMC：${fallbackError.message} 请稍后重试；本次未返回文献，不代表没有相关研究。`, fallbackError.status || 502);
         }
         if (!epmc || !epmc.resultList || !Array.isArray(epmc.resultList.result) || !Number.isFinite(Number(epmc.hitCount))) throw new ResearchError('Europe PMC 返回格式无效，请稍后重试。');
         base.source = 'Europe PMC（PubMed记录）'; base.provider = 'Europe PMC'; base.query = epmcQuery; base.total = Number(epmc.hitCount); base.warnings.push(`PubMed 不可用，已切换 Europe PMC：${primaryError.message}`);
         const rows = epmc.resultList.result;
+        base.hasMore = offset + rows.length < base.total;
         base.records = rows.slice(0, limit).map(x => { const pmid = String(x.pmid || x.id || ''); const clean = value => decodeXml(String(value || '').replace(/<[^>]+>/g, '').trim()); const abstract = clean(x.abstractText).slice(0, 1500); return { pmid, title: clean(x.title), journal: x.journalInfo?.journal?.title || x.journalTitle || '', date: x.firstPublicationDate || '', doi: x.doi || '', url: pmid ? `https://pubmed.ncbi.nlm.nih.gov/${encodeURIComponent(pmid)}/` : '', abstract }; }).filter(x => x.pmid);
         const found = new Map(); for (const row of rows) for (const c of (row.chemicalList?.chemical || [])) { const identifier = String(c.registryNumber || '').trim(); if (!identifier || identifier === '0') continue; const name = String(c.name || '').trim(); if (!name) continue; const key = `${name.toLowerCase()}|${identifier}`; const item = found.get(key) || { name, identifier, pmids: [], excerpts: [], status: '文献索引·待核验', source: 'Europe PMC化学索引' }; if (row.pmid && !item.pmids.includes(String(row.pmid))) item.pmids.push(String(row.pmid)); found.set(key, item); }
         base.candidates = [...found.values()].slice(0, 20); return base;

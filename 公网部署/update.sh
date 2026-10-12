@@ -36,6 +36,7 @@ for attempt in {1..10}; do
   sleep 2
 done
 test "$healthy" = true
+curl --fail --silent --show-error --max-time 10 https://43.129.169.13/api/teaching-case > /dev/null
 sudo systemctl is-active --quiet herblab
 trap - ERR
 printf '\n部署完成：%s\n备份：%s\n' "$revision" "$backup_dir"
