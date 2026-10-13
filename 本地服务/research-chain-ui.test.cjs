@@ -14,6 +14,11 @@ function boot(fetchImpl, extras={}){
 }
 const response=(data,status=200)=>({ok:status<400,status,json:async()=>data});
 
+test('default provider and extraction failures are visible without claiming no compounds',async()=>{
+ let input;const {context,listeners}=boot(async(url,opt)=>{input=JSON.parse(opt.body);return response({researchId:'r-source',disease:{label:'三叉神经痛'},source:'Europe PMC',provider:'Europe PMC',query:'TITLE_ABS:trigeminal',retrievedAt:'2026-10-13',records:[{pmid:'1',title:'Paper'}],candidates:[],candidateExtraction:{status:'unavailable',message:'化学注释服务不可用'}})});
+ listeners.click({target:{closest:s=>s==='#researchSearchV2'?{}:null}});await new Promise(r=>setImmediate(r));assert.equal(input.provider,'europepmc');const html=context.ResearchUI.evidencePanel();assert.match(html,/实际来源：Europe PMC/);assert.match(html,/化学注释服务不可用/);assert.match(html,/本次未提供可提取注释/);assert.doesNotMatch(html,/没有相关成分/);
+});
+
 test('research chain defaults to trigeminal neuralgia, keeps the start page focused, and gates adoption',async()=>{
   const calls=[];const f=async(url,options)=>{calls.push({url,options});return String(url).includes('/api/research')?response({researchId:'r1',disease:{label:'三叉神经痛'},scope:'all',records:[],candidates:[{name:'A',identifier:'machine-id',pmids:[]}] }):response({})};
   const {context,listeners}=boot(f); const start=context.ResearchUI.taskPanel();assert.match(start,/三叉神经痛/);assert.match(start,/疾病全部文献/);assert.doesNotMatch(start,/独立成分候选池|肺癌|EGFR/);

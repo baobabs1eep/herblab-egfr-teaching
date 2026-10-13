@@ -103,7 +103,10 @@ function mergeResearchPage(existing, page) {
     if (!old) candidates.set(key, {...item, pmids:[...(item.pmids || [])], excerpts:[...(item.excerpts || [])]});
     else candidates.set(key, {...old, ...item, pmids:[...new Set([...(old.pmids || []), ...(item.pmids || [])])], excerpts:[...new Set([...(old.excerpts || []), ...(item.excerpts || [])])].slice(0, 8)});
   }
-  return {...existing, ...page, records:[...records.values()], candidates:[...candidates.values()].slice(0, 50), warnings:[...new Set([...(existing.warnings || []), ...(page.warnings || [])])], offset:0, loaded:[...records.values()].length, hasMore:[...records.values()].length < Number(page.total || existing.total || 0)};
+  const extractionPages=[...(existing.extractionPages||[existing.candidateExtraction].filter(Boolean)),page.candidateExtraction].filter(Boolean);
+  const incomplete=extractionPages.some(x=>['partial','unavailable'].includes(x.status));
+  const candidateExtraction=extractionPages.length?{...page.candidateExtraction,provider:page.provider,status:incomplete?([...candidates.values()].length?'partial':'unavailable'):[...candidates.values()].length?'complete':[...records.values()].length?'no_annotations':'no_records',message:incomplete?'部分页面的化学注释未完整覆盖或不可用；已保留可获取的线索，不代表没有相关成分。':'已按同一来源合并本轮注释；未返回线索不代表没有相关成分。'}:undefined;
+  return {...existing, ...page, candidateExtraction,extractionPages,records:[...records.values()], candidates:[...candidates.values()].slice(0, 50), warnings:[...new Set([...(existing.warnings || []), ...(page.warnings || [])])], offset:0, loaded:[...records.values()].length, hasMore:[...records.values()].length < Number(page.total || existing.total || 0)};
 }
 function json(res, status, data) { res.writeHead(status, {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}); res.end(JSON.stringify(data)); }
 async function body(req) {
@@ -125,7 +128,7 @@ const server = http.createServer(async (req, res) => {
     catch (err) { return json(res, 500, {error: err.message || '教学案例暂不可用。'}); }
   }
   if (req.method === 'GET' && route === '/api/sources') return json(res,200,{sources:[
-    {name:'Europe PMC',status:'fallback',description:'NCBI 不可用时检索 Europe PMC 的 PubMed 记录，保留实际查询来源。',url:'https://europepmc.org/RestfulWebService'},
+    {name:'Europe PMC',status:'default',description:'本地与公网统一默认检索来源，并查询化学实体注释；保留实际查询及覆盖状态。',url:'https://europepmc.org/RestfulWebService'},
     {name:'PubMed',status:'live_with_fallback',description:'按疾病、靶点和成分检索文献；检索命中需阅读原文核验。',url:'https://pubmed.ncbi.nlm.nih.gov/'},
     {name:'PubTator3',status:'upstream_dependent',description:'识别检索文献中的化学实体；机器识别尚需核对身份、用途及相关性。',url:'https://www.ncbi.nlm.nih.gov/research/pubtator3/'},
     {name:'PubChem',status:'upstream_dependent',description:'按分子名称查询 CID、分子式、分子量与 InChIKey。',url:'https://pubchem.ncbi.nlm.nih.gov/'},
@@ -178,7 +181,7 @@ const server = http.createServer(async (req, res) => {
           const sameDisease=String(saved.data.disease?.term||'').toLowerCase()===String(result.disease?.term||'').toLowerCase();
           const sameScope=(saved.data.scope||'natural-products')===(result.scope||'natural-products');
           const searchInput=saved.data.searchInput||{};
-          const sameOptions=['target','compound','sort','fromYear','toYear'].every(key=>String(searchInput[key]||'')===String(input[key]||''));
+          const sameOptions=['target','compound','sort','fromYear','toYear'].every(key=>String(searchInput[key]||'')===String(input[key]||'')) && (saved.data.requestedProvider||'europepmc')===(result.requestedProvider||'europepmc') && saved.data.provider===result.provider;
           if (!sameDisease||!sameScope||!sameOptions) return json(res,409,{error:'加载更多的检索条件与本轮研究不一致，请重新开始研究。'});
           const merged=mergeResearchPage(saved.data,{...result,target:input.target||saved.data.target||''});
           researchSessions.set(requestedId,{savedAt:Date.now(),data:merged});

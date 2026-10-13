@@ -4,6 +4,8 @@ const PUBMED = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
 const PUBCHEM = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/';
 const PUBTATOR = 'https://www.ncbi.nlm.nih.gov/research/pubtator3-api/publications/export/biocjson?pmids=';
 const EUROPEPMC = 'https://www.ebi.ac.uk/europepmc/webservices/rest/search';
+const EPMC_ANNOTATIONS = 'https://www.ebi.ac.uk/europepmc/annotations_api/annotationsByArticleIds';
+const SEARCH_POLICY_VERSION = 'unified-epmc-v1';
 const ALIASES = new Map([
   ['三叉神经痛', ['Trigeminal neuralgia', 'trigeminal neuralgia']], ['trigeminal neuralgia', ['Trigeminal neuralgia', 'trigeminal neuralgia']],
   ['高血压', ['高血压', 'hypertension']], ['原发性高血压', ['原发性高血压', 'primary hypertension']], ['hypertension', ['Hypertension', 'hypertension']], ['primary hypertension', ['Primary hypertension', 'primary hypertension']],
@@ -54,7 +56,50 @@ function createResearchService(options = {}) {
   }
   async function bodyJson(url, init) { const r = await pacedFetch(url, init); checkAccess(r); try { return await r.json(); } catch { throw new ResearchError('上游返回格式无效，请稍后重试。'); } }
   async function bodyText(url) { const r = await pacedFetch(url); checkAccess(r); return r.text(); }
+  async function epmcSearch(input = {}, requestedProvider = 'europepmc') {
+    let disease = diseaseInput(input.disease);
+    if (disease.needsResolution) {
+      if (typeof options.resolveDisease !== 'function') throw new ResearchError('暂时无法自动识别这个中文疾病名称，请填写对应英文名称后检索。', 400);
+      let term; try { term = normalizeInput(await options.resolveDisease(disease.label), 'normalized disease', 100); } catch (e) { throw new ResearchError(e?.message || '疾病名称自动规范化失败，请填写对应英文名称后检索。', 502); }
+      if (!/^[A-Za-z0-9][A-Za-z0-9 .,'()\/-]{1,99}$/.test(term)) throw new ResearchError('疾病名称自动规范化结果无效，请填写对应英文名称后检索。', 502);
+      disease = { label: disease.label, term, normalizedBy: 'AI' };
+    }
+    const target = normalizeInput(input.target, 'target', 100), compound = normalizeInput(input.compound, 'compound', 120);
+    const rawLimit = Number(input.limit); const limit = Math.max(1, Math.min(50, Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 20));
+    const rawOffset = Number(input.offset); const offset = Math.max(0, Math.min(1000, Number.isFinite(rawOffset) ? Math.floor(rawOffset) : 0));
+    const sort = input.sort === 'relevance' ? 'relevance' : 'date'; const currentYear = new Date().getUTCFullYear();
+    const fromYear = Number.isInteger(Number(input.fromYear)) && Number(input.fromYear) >= 1800 && Number(input.fromYear) <= currentYear ? Number(input.fromYear) : null;
+    const toYear = Number.isInteger(Number(input.toYear)) && Number(input.toYear) >= 1800 && Number(input.toYear) <= currentYear ? Number(input.toYear) : null;
+    if (fromYear && toYear && fromYear > toYear) throw new ResearchError('起始年份不能晚于结束年份。', 400);
+    const scope = input.scope === 'all' ? 'all' : 'natural-products';
+    const queryParts = [`SRC:MED AND TITLE_ABS:"${disease.term}"`]; if (target) queryParts.push(`TITLE_ABS:"${target}"`); if (compound) queryParts.push(`TITLE_ABS:"${compound}"`); if (scope !== 'all' && !compound) queryParts.push('(TITLE_ABS:"natural product" OR TITLE_ABS:herbal OR TITLE_ABS:flavonoid OR TITLE_ABS:phytochemical OR TITLE_ABS:"plant extract" OR TITLE_ABS:"traditional Chinese medicine")');
+    if (fromYear || toYear) queryParts.push(`FIRST_PDATE:[${fromYear || 1800}-01-01 TO ${toYear || currentYear}-12-31]`);
+    const queryText = queryParts.join(' AND ')+(sort==='date'?' sort_date:y':''); const key = JSON.stringify([SEARCH_POLICY_VERSION, requestedProvider, disease.term, target, compound, scope, limit, offset, sort, fromYear, toYear]);
+    const old = cache.get(key); if (old && old.expires > Date.now()) return { ...old.value, cached: true }; if (inflight.has(key)) return inflight.get(key);
+    const work = (async () => {
+      const warnings = []; const base = { disease, scope, query: queryText, total: 0, offset, nextOffset: offset + limit, pageSize: limit, sort, fromYear, toYear, hasMore: false, retrievedAt: new Date().toISOString(), records: [], candidates: [], warnings, source: 'Europe PMC', provider: 'Europe PMC', requestedProvider, searchPolicyVersion: SEARCH_POLICY_VERSION, cached: false };
+      let data; try { data = await bodyJson(`${EUROPEPMC}?query=${encodeURIComponent(queryText)}&resultType=core&format=json&pageSize=${limit}&page=${Math.floor(offset / limit) + 1}`); } catch (e) { throw new ResearchError(`Europe PMC 文献检索暂不可用：${e.message} 请稍后重试；本次未返回文献，不代表没有相关研究。`, e.status || 502); }
+      if (!data || !data.resultList || !Array.isArray(data.resultList.result) || !Number.isFinite(Number(data.hitCount))) throw new ResearchError('Europe PMC 返回格式无效，请稍后重试。');
+      const rows = data.resultList.result; base.total = Number(data.hitCount); base.hasMore = offset + rows.length < base.total;
+      const clean = value => decodeXml(String(value || '').replace(/<[^>]+>/g, '').trim());
+      base.records = rows.slice(0, limit).map(x => { const pmid = String(x.pmid || x.id || ''); return { pmid, title: clean(x.title), journal: x.journalInfo?.journal?.title || x.journalTitle || '', date: x.firstPublicationDate || '', doi: x.doi || '', url: pmid ? `https://pubmed.ncbi.nlm.nih.gov/${encodeURIComponent(pmid)}/` : '', abstract: clean(x.abstractText).slice(0, 1500) }; }).filter(x => /^\d+$/.test(x.pmid));
+      const found = new Map(); const add = (name, identifier, pmid, excerpt, source, status = '文献索引·待核验') => { name = String(name || '').trim(); identifier = String(identifier || '').trim(); pmid = String(pmid || '').trim(); if (!name || !/^\d+$/.test(pmid) || (!identifier || identifier === '0' || identifier === '-')) return; const key = identifier || name.toLowerCase(); const item = found.get(key) || { name, identifier, pmids: [], excerpts: [], status, source }; if (!item.pmids.includes(pmid)) item.pmids.push(pmid); if (excerpt && !item.excerpts.includes(excerpt)) item.excerpts.push(String(excerpt).slice(0, 250)); found.set(key, item); };
+      for (const row of rows) for (const c of (Array.isArray(row.chemicalList?.chemical) ? row.chemicalList.chemical : [])) add(c.name, c.registryNumber, row.pmid || row.id, '', 'Europe PMC');
+      const pmids = base.records.map(x => x.pmid); const extraction = { status: 'no_records', provider: 'Europe PMC', requestedArticles: pmids.length, annotatedArticles: 0, message: '当前页没有可注释的文章。' }; base.candidateExtraction = extraction;
+      if (!pmids.length) return base;
+      let annotationFailure = false; const annotated = new Set();
+      for (let i = 0; i < pmids.length; i += 8) { const group = pmids.slice(i, i + 8); const url = `${EPMC_ANNOTATIONS}?articleIds=${group.map(id => `MED:${encodeURIComponent(id)}`).join(',')}&section=Abstract&type=Chemicals&format=JSON`; try { const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 8000); let payload;try{const response=await fetchImpl(url,{signal:ctl.signal,headers:{accept:'application/json'}});if(!response?.ok)throw new ResearchError('annotations 请求失败（'+(response?.status||0)+'）');payload=await response.json();}finally{clearTimeout(timer);} if (!Array.isArray(payload)) throw new ResearchError('Europe PMC annotations 返回格式无效。'); for (const row of payload) { const pmid = String(row?.extId || ''); if (row?.source !== 'MED' || !group.includes(pmid) || !Array.isArray(row.annotations)) continue; annotated.add(pmid); for (const ann of row.annotations) { if (ann?.type !== 'Chemicals' || typeof ann.exact !== 'string' || !Array.isArray(ann.tags)) continue; const tag = ann.tags.find(x => x && typeof x.name === 'string' && typeof x.uri === 'string'); if (!tag) continue; add(tag.name || ann.exact, tag.uri, pmid, `${String(ann.prefix || '')}${ann.exact}${String(ann.postfix || '')}`, 'Europe PMC annotations', '机器识别·待核验'); } } } catch (e) { annotationFailure = true; warnings.push(`Europe PMC 化学注释暂不可用：${e.message}`); } }
+      extraction.annotatedArticles = annotated.size; if (annotationFailure) extraction.status = found.size ? 'partial' : 'unavailable'; else if (!found.size) extraction.status = 'no_annotations'; else extraction.status = annotated.size<pmids.length?'partial':'complete'; extraction.message = annotationFailure ? '部分化学注释请求失败，候选仅覆盖已成功返回的注释。' : (found.size ? '化学索引或注释已返回；'+annotated.size+'/'+pmids.length+' 篇提供注释，缺失覆盖不代表没有相关成分，记录仍需人工核验。' : '当前页没有可用的化学注释。');
+      base.candidates = [...found.values()].slice(0, 20); return base;
+    })(); inflight.set(key, work); try { const result = await work; cache.set(key, { value: result, expires: Date.now() + 3600000 }); while (cache.size > 100) cache.delete(cache.keys().next().value); return result; } finally { inflight.delete(key); }
+  }
   async function search(input = {}) {
+    const requestedProvider = input.provider == null ? 'europepmc' : String(input.provider).trim().toLowerCase();
+    if (!['europepmc', 'pubmed'].includes(requestedProvider)) throw new ResearchError('provider must be europepmc or pubmed', 400);
+    if (requestedProvider === 'pubmed') { const result = await pubmedSearch(input); result.requestedProvider = 'pubmed'; result.searchPolicyVersion = SEARCH_POLICY_VERSION; return result; }
+    return epmcSearch(input, requestedProvider);
+  }
+  async function pubmedSearch(input = {}) {
     let disease = diseaseInput(input.disease);
     if (disease.needsResolution) {
       if (typeof options.resolveDisease !== 'function') throw new ResearchError('暂时无法自动识别这个中文疾病名称，请填写对应英文名称后检索。', 400);
@@ -74,8 +119,8 @@ function createResearchService(options = {}) {
     if (fromYear && toYear && fromYear > toYear) throw new ResearchError('起始年份不能晚于结束年份。', 400);
     const scope = input.scope === 'all' ? 'all' : 'natural-products';
     const query = [`("${disease.term}"[Title/Abstract])`]; if (scope !== 'all' && !compound) query.push('("natural product" OR herbal OR flavonoid OR phytochemical OR "plant extract" OR "traditional Chinese medicine")[Title/Abstract]'); if (target) query.push(`("${target}"[Title/Abstract])`); if (compound) query.push(`("${compound}"[Title/Abstract])`); const queryText = query.join(' AND ');
-    const key = JSON.stringify([disease.term, target, compound, scope, limit, offset, sort, fromYear, toYear]); const old = cache.get(key); if (old && old.expires > Date.now()) return { ...old.value, cached: true }; if (inflight.has(key)) return inflight.get(key);
-    const work = (async () => { const warnings = []; const base = { disease, scope, query: queryText, total: 0, offset, nextOffset: offset + limit, pageSize: limit, sort, fromYear, toYear, hasMore: false, retrievedAt: new Date().toISOString(), records: [], candidates: [], warnings, source: 'PubMed', cached: false };
+    const key = JSON.stringify([SEARCH_POLICY_VERSION, 'pubmed', disease.term, target, compound, scope, limit, offset, sort, fromYear, toYear]); const old = cache.get(key); if (old && old.expires > Date.now()) return { ...old.value, cached: true }; if (inflight.has(key)) return inflight.get(key);
+      const work = (async () => { const warnings = []; const base = { disease, scope, query: queryText, total: 0, offset, nextOffset: offset + limit, pageSize: limit, sort, fromYear, toYear, hasMore: false, retrievedAt: new Date().toISOString(), records: [], candidates: [], warnings, source: 'PubMed', provider: 'PubMed', requestedProvider: 'pubmed', searchPolicyVersion: SEARCH_POLICY_VERSION, cached: false };
       let es; let ids; try {
         const dateParams = `${fromYear ? `&mindate=${fromYear}/01/01` : ''}${toYear ? `&maxdate=${toYear}/12/31` : ''}${fromYear || toYear ? '&datetype=pdat' : ''}`;
         es = await bodyJson(`${PUBMED}esearch.fcgi?tool=herblab&db=pubmed&retmode=json&retmax=${limit}&retstart=${offset}&sort=${sort === 'date' ? 'pub+date' : 'relevance'}${dateParams}&term=${encodeURIComponent(queryText)}`);
