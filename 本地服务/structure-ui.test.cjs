@@ -17,3 +17,21 @@ test('structure action submits only batch names reference and target, with no li
  const calls=[];const {handlers}=boot({names:'candidate',reference:'reference',accession:'P00533',pool:[{name:'extra'}]},async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return {ok:true,json:async()=>({reference:{cid:1},candidates:[]})}});
  await handlers.click({target:{closest:()=>({id:'structureRun'})}});assert.equal(calls.length,1);assert.equal(calls[0].url,'/api/structure-screen');assert.deepEqual(calls[0].body,{names:['candidate'],reference:'reference',accession:'P00533'});
 });
+
+test('switching study scopes hides old structure results and restores the correct study',async()=>{
+ const {c,handlers}=boot();c.StructureUI.panel({scope:'tn',disease:'三叉神经痛'});
+ handlers.input({target:{id:'structureNames',value:'Liquiritin'}});
+ assert.match(c.StructureUI.panel({scope:'tn',disease:'三叉神经痛'}),/Liquiritin/);
+ assert.doesNotMatch(c.StructureUI.panel({scope:'diabetes',disease:'Ⅱ型糖尿病'}),/Liquiritin/);
+ assert.match(c.StructureUI.panel({scope:'tn',disease:'三叉神经痛'}),/Liquiritin/);
+});
+
+test('late structure response stays in original study after disease switch',async()=>{
+ let finish;const {c,handlers}=boot({},async()=>new Promise(resolve=>{finish=()=>resolve({ok:true,json:async()=>({reference:{cid:1},candidates:[{name:'TN_ONLY',structure:{status:'computed',score:90},binding:{status:'pending'}}]})})}));
+ c.StructureUI.panel({scope:'tn',disease:'三叉神经痛'});
+ handlers.input({target:{id:'structureNames',value:'Liquiritin'}});handlers.input({target:{id:'structureReference',value:'reference'}});
+ const pending=handlers.click({target:{closest:()=>({id:'structureRun'})}});
+ c.StructureUI.panel({scope:'diabetes',disease:'Ⅱ型糖尿病'});finish();await pending;
+ assert.doesNotMatch(c.StructureUI.panel({scope:'diabetes',disease:'Ⅱ型糖尿病'}),/TN_ONLY/);
+ assert.match(c.StructureUI.panel({scope:'tn',disease:'三叉神经痛'}),/TN_ONLY/);
+});
