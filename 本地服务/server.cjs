@@ -18,19 +18,24 @@ for (const line of (fs.existsSync(envFile) ? fs.readFileSync(envFile, 'utf8') : 
   const m = line.match(/^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/);
   if (m) config[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
 }
-for (const key of ['PORT','HOST','PUBLIC_ORIGIN','PUBLIC_HOST','PUBLIC_SCHEME','DEMO_USER','DEMO_PASSWORD','YUANQI_APP_ID','YUANQI_APP_KEY']) {
+for (const key of ['PORT','HOST','PUBLIC_ORIGIN','PUBLIC_HOST','PUBLIC_SCHEME','PUBLIC_ACCESS','TRUST_PROXY','DEMO_USER','DEMO_PASSWORD','YUANQI_APP_ID','YUANQI_APP_KEY']) {
   if (process.env[key] !== undefined) config[key] = process.env[key];
 }
 const port = Number(config.PORT || 8787);
 const host = config.HOST || '127.0.0.1';
 const publicMode = !['127.0.0.1','localhost','::1'].includes(host);
 const proxyMode = !publicMode && !!config.PUBLIC_HOST;
+function flag(value) { return /^(1|true|yes|on)$/i.test(String(value || '').trim()); }
+const publicAccess = flag(config.PUBLIC_ACCESS);
+const trustProxy = flag(config.TRUST_PROXY);
 if (config.PUBLIC_HOST && !/^[a-zA-Z0-9.-]+$/.test(config.PUBLIC_HOST)) throw new Error('PUBLIC_HOST 格式不正确。');
+const renderHostname = String(process.env.RENDER_EXTERNAL_HOSTNAME || '').trim();
+if (renderHostname && !/^[a-zA-Z0-9.-]+$/.test(renderHostname)) throw new Error('RENDER_EXTERNAL_HOSTNAME 格式不正确。');
 const publicScheme = config.PUBLIC_SCHEME || 'https';
 if (!['http','https'].includes(publicScheme)) throw new Error('PUBLIC_SCHEME 格式不正确。');
-const publicOrigin = config.PUBLIC_ORIGIN ? new URL(config.PUBLIC_ORIGIN).origin : config.PUBLIC_HOST ? `${publicScheme}://${config.PUBLIC_HOST}` : null;
+const publicOrigin = config.PUBLIC_ORIGIN ? new URL(config.PUBLIC_ORIGIN).origin : config.PUBLIC_HOST ? `${publicScheme}://${config.PUBLIC_HOST}` : renderHostname ? `https://${renderHostname}` : null;
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT 必须为有效端口。');
-if (publicMode && (!publicOrigin || !publicOrigin.startsWith('https://') || !config.DEMO_PASSWORD || config.DEMO_PASSWORD.length < 12)) throw new Error('公网模式必须设置 HTTPS 的 PUBLIC_ORIGIN 和至少 12 位的 DEMO_PASSWORD。');
+if (publicMode && (!publicOrigin || !publicOrigin.startsWith('https://') || (!publicAccess && (!config.DEMO_PASSWORD || config.DEMO_PASSWORD.length < 12)))) throw new Error('公网模式必须设置 HTTPS 公网地址；免登录需启用 PUBLIC_ACCESS，否则需设置至少 12 位的 DEMO_PASSWORD。');
 if (proxyMode && (!publicOrigin.startsWith('https://') || new URL(publicOrigin).host !== config.PUBLIC_HOST)) throw new Error('反向代理模式必须设置匹配的 HTTPS 公网地址。');
 const configured = !!config.YUANQI_APP_ID && !!config.YUANQI_APP_KEY && !/^(请|replace-with-)/i.test(config.YUANQI_APP_KEY);
 async function resolveChineseDisease(label) {
@@ -56,7 +61,7 @@ const research = createResearchService({resolveDisease:resolveChineseDisease});
 const candidateChecker = createCandidateChecker({research,sources:structuredSources});
 const allowedHosts = publicMode || proxyMode ? [new URL(publicOrigin).host] : [`127.0.0.1:${port}`, `localhost:${port}`];
 function authenticated(req) {
-  if (!publicMode) return true;
+  if (!publicMode || publicAccess) return true;
   const value = req.headers.authorization || '';
   if (!value.startsWith('Basic ')) return false;
   let plain;
@@ -77,7 +82,9 @@ const perIp = new Map();
 let daily = {day:new Date().toISOString().slice(0,10),count:0};
 function rateLimited(req) {
   const peer = req.socket.remoteAddress;
-  const ip = (peer==='127.0.0.1'||peer==='::ffff:127.0.0.1') && typeof req.headers['x-real-ip']==='string' ? req.headers['x-real-ip'] : peer;
+  const forwarded = typeof req.headers['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'].split(',')[0].trim() : '';
+  const realIp = typeof req.headers['x-real-ip'] === 'string' ? req.headers['x-real-ip'].trim() : '';
+  const ip = trustProxy && /^[0-9a-fA-F:.]{3,64}$/.test(forwarded) ? forwarded : (peer==='127.0.0.1'||peer==='::ffff:127.0.0.1') && /^[0-9a-fA-F:.]{3,64}$/.test(realIp) ? realIp : peer;
   const now = Date.now(), recent=(perIp.get(ip)||[]).filter(t=>now-t<300000);
   if (perIp.size>2000) for (const [key,times] of perIp) if (!times.length||now-times[times.length-1]>300000) perIp.delete(key);
   if (daily.day!==new Date().toISOString().slice(0,10)) daily={day:new Date().toISOString().slice(0,10),count:0};

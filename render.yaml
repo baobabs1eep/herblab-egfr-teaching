@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: qizhen-herblab-agent
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: PUBLIC_ACCESS
+        value: "true"
+      - key: TRUST_PROXY
+        value: "true"
+      - key: YUANQI_APP_ID
+        sync: false
+      - key: YUANQI_APP_KEY
+        sync: false

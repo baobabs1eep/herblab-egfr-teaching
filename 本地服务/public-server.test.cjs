@@ -49,6 +49,37 @@ test('public mode blocks anonymous users, wrong host, and cross-origin chat', as
   } finally { proc.kill(); }
 });
 
+test('public access mode allows anonymous users but still rejects wrong hosts and origins', async () => {
+  const port = await freePort();
+  const proc = spawn(process.execPath,[path.join(__dirname,'server.cjs')],{env:{...process.env,HOST:'0.0.0.0',PORT:String(port),PUBLIC_ORIGIN:'https://demo.example.test',PUBLIC_ACCESS:'true',TRUST_PROXY:'true',YUANQI_APP_ID:'test',YUANQI_APP_KEY:'dummy'},stdio:'ignore'});
+  try {
+    let ready = false;
+    for (let i=0;i<30;i++) {
+      await new Promise(resolve => setTimeout(resolve,100));
+      try { if (await request(port,'/api/health',{Host:'demo.example.test'})===200) {ready=true;break;} } catch {}
+    }
+    assert.equal(ready,true,'server did not start');
+    assert.equal(await request(port,'/',{Host:'demo.example.test'}),200);
+    assert.equal(await request(port,'/',{Host:'other.example.test'}),403);
+    assert.equal(await request(port,'/api/chat',{Host:'demo.example.test',Origin:'https://other.example.test','Content-Type':'application/json'},'POST','{}'),403);
+  } finally { proc.kill(); }
+});
+
+test('Render hostname supplies the HTTPS public origin automatically', async () => {
+  const port = await freePort();
+  const proc = spawn(process.execPath,[path.join(__dirname,'server.cjs')],{env:{...process.env,HOST:'0.0.0.0',PORT:String(port),RENDER_EXTERNAL_HOSTNAME:'qizhen.example.onrender.com',PUBLIC_ACCESS:'true',YUANQI_APP_ID:'test',YUANQI_APP_KEY:'dummy'},stdio:'ignore'});
+  try {
+    let ready = false;
+    for (let i=0;i<30;i++) {
+      await new Promise(resolve => setTimeout(resolve,100));
+      try { if (await request(port,'/api/health',{Host:'qizhen.example.onrender.com'})===200) {ready=true;break;} } catch {}
+    }
+    assert.equal(ready,true,'server did not start');
+    assert.equal(await request(port,'/',{Host:'qizhen.example.onrender.com'}),200);
+    assert.equal(await request(port,'/',{Host:'another.onrender.com'}),403);
+  } finally { proc.kill(); }
+});
+
 test('loopback proxy mode accepts the public host and rejects a foreign origin', async () => {
   const port = await freePort();
   const proc = spawn(process.execPath,[path.join(__dirname,'server.cjs')],{env:{...process.env,HOST:'127.0.0.1',PORT:String(port),PUBLIC_HOST:'demo.example.test',PUBLIC_SCHEME:'https',YUANQI_APP_ID:'test',YUANQI_APP_KEY:'dummy'},stdio:'ignore'});
