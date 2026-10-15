@@ -108,9 +108,6 @@
         },
         "coconut": {
           "status": "not_requested"
-        },
-        "chembl": {
-          "status": "not_requested"
         }
       },
       "target": {

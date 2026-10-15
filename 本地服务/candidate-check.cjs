@@ -39,6 +39,26 @@ function validTarget(value) {
   return typeof value === 'string' && /^[A-Za-z0-9_-]{1,30}$/.test(value.trim());
 }
 
+function suggestedTargets(tcmbankResult, diseaseResult) {
+  const ingredientRecords = tcmbankResult?.records || [];
+  const ingredientTargets = ingredientRecords.flatMap(record => (record.targets || []).map(target => ({ ...target, ingredientId: record.identifier, ingredientName: record.name })));
+  const diseaseTargets = diseaseResult?.records || [];
+  const diseaseByGene = new Map(diseaseTargets.map(target => [String(target.gene || '').toUpperCase(), target]));
+  const found = new Map();
+  for (const target of ingredientTargets) {
+    const gene = String(target.gene || '').toUpperCase();
+    if (!gene || found.has(gene)) continue;
+    const disease = diseaseByGene.get(gene);
+    found.set(gene, { ...target, gene, evidence: disease ? '成分与疾病共同关联' : '成分关联', diseaseAssociated: Boolean(disease), diseaseReference: disease?.reference || '' });
+  }
+  for (const target of diseaseTargets) {
+    const gene = String(target.gene || '').toUpperCase();
+    if (!gene || found.has(gene)) continue;
+    found.set(gene, { ...target, gene, evidence: '疾病关联', diseaseAssociated: true });
+  }
+  return [...found.values()].sort((a, b) => Number(b.diseaseAssociated) - Number(a.diseaseAssociated) || a.gene.localeCompare(b.gene)).slice(0, 20);
+}
+
 function createCandidateChecker({ research, sources } = {}) {
   if (!research || !sources) throw new TypeError('research and sources services are required');
   const invoke = (service, method, ...args) => Promise.resolve().then(() => {
@@ -57,20 +77,27 @@ function createCandidateChecker({ research, sources } = {}) {
     const jobs = [
       invoke(research, 'compound', name),
       invoke(research, 'naturalProduct', name),
-      invoke(sources, 'molecule', name),
+      invoke(sources, 'ingredient', name),
     ];
     if (targetRequested) jobs.push(invoke(sources, 'target', target));
+    const disease = typeof input.disease === 'string' ? input.disease.trim() : '';
+    if (disease) jobs.push(invoke(sources, 'diseaseTargets', disease));
     const results = await Promise.allSettled(jobs);
     const pubchem = settledResult(results[0]);
     const coconut = settledResult(results[1]);
-    const chembl = settledResult(results[2]);
+    const tcmbank = settledResult(results[2]);
     const targetResult = targetRequested ? settledResult(results[3]) : { status: 'not_requested' };
+    const diseaseIndex = targetRequested ? 4 : 3;
+    const diseaseTargetResult = disease ? settledResult(results[diseaseIndex]) : { status: 'not_requested' };
+    const suggestions = suggestedTargets(tcmbank.data, diseaseTargetResult.data);
 
     return {
       schemaVersion: 1,
       candidate: { ...candidate },
-      identity: { pubchem, coconut, chembl },
+      identity: { pubchem, coconut, tcmbank },
       target: targetResult,
+      diseaseTargets: diseaseTargetResult,
+      suggestedTargets: suggestions,
       provenance: {
         disease: input.disease ?? '',
         query: input.query ?? '',
@@ -80,7 +107,7 @@ function createCandidateChecker({ research, sources } = {}) {
       },
       readiness: {
         status: 'pending_data',
-        missing: ['独立结构、靶点／通道与亲和力匹配计算', '过滤规则与性质'],
+        missing: ['靶点作用方向与实验验证', '过滤规则与性质'],
         canRank: false,
       },
       reviewRequired: true,
@@ -90,4 +117,4 @@ function createCandidateChecker({ research, sources } = {}) {
   return { check };
 }
 
-module.exports = { createCandidateChecker, summarizeRecords, validTarget };
+module.exports = { createCandidateChecker, summarizeRecords, validTarget, suggestedTargets };

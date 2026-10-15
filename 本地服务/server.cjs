@@ -9,7 +9,7 @@ const {createSourceService} = require('./sources.cjs');
 const {createCandidateChecker} = require('./candidate-check.cjs');
 const {validateResearchImport, loadTeachingCase} = require('./literature-import.cjs');
 const structuredSources = createSourceService();
-const structureScreen = require('./structure-screen.cjs').createStructureScreen();
+const structureScreen = require('./structure-screen.cjs').createStructureScreen({tcmbank:structuredSources});
 const researchSessions = new Map();
 let researchActive = 0;
 const config = {};
@@ -138,11 +138,11 @@ const server = http.createServer(async (req, res) => {
     {name:'PubChem',status:'upstream_dependent',description:'按分子名称查询 CID、分子式、分子量与 InChIKey。',url:'https://pubchem.ncbi.nlm.nih.gov/'},
     {name:'COCONUT',status:'live',description:'天然产物名称与结构查询；并非所有记录均为中药成分。',url:'https://coconut.naturalproducts.net/'},
     {name:'UniProt',status:'live',description:'查询人工审阅的人类靶点记录；基因名匹配需要确认，不推断疾病关联。',url:'https://www.uniprot.org/'},
-    {name:'ChEMBL',status:'live',description:'查询化合物身份及实验活性；不同实验条件与单位不能直接混合排名。',url:'https://www.ebi.ac.uk/chembl/'},
+    {name:'TCMBank',status:'live',description:'查询中药单体身份、关联中药、疾病、靶点及部分 ADMET 字段；数据库关系不代表直接结合或疗效。',url:'http://tcmbank.cn/'},
     {name:'HERB',status:'manual',description:'官方网页查阅；尚未取得并导入获准使用的数据导出文件。',url:'http://herb.ac.cn/v2/'},
     {name:'TCMSP',status:'manual',description:'官方网页查阅；未发现公开接口，尚未导入授权导出数据。',url:'https://old.tcmsp-e.com/tcmsp.php'}
   ]});
-  if (req.method === 'POST' && ['/api/research','/api/research-import','/api/compound','/api/natural-product','/api/target','/api/chembl-molecule','/api/bioactivity','/api/article','/api/candidate-check','/api/structure-screen'].includes(route)) {
+  if (req.method === 'POST' && ['/api/research','/api/research-import','/api/compound','/api/natural-product','/api/target','/api/tcmbank-ingredient','/api/tcmbank-detail','/api/tcmbank-targets','/api/tcmbank-disease-targets','/api/article','/api/candidate-check','/api/structure-screen'].includes(route)) {
     const expected = publicMode || proxyMode ? publicOrigin : `http://${req.headers.host}`;
     if (req.headers.origin && req.headers.origin!==expected) return json(res,403,{error:'请从研学页面发起检索。'});
     if (!(req.headers['content-type']||'').startsWith('application/json')) return json(res,415,{error:'请求格式应为 JSON。'});
@@ -171,8 +171,10 @@ const server = http.createServer(async (req, res) => {
         '/api/compound':()=>research.compound(input.name),
         '/api/natural-product':()=>research.naturalProduct(input.name),
         '/api/target':()=>structuredSources.target(input.query),
-        '/api/chembl-molecule':()=>structuredSources.molecule(input.name),
-        '/api/bioactivity':()=>structuredSources.bioactivity(input.moleculeId),
+        '/api/tcmbank-ingredient':()=>structuredSources.ingredient(input.name),
+        '/api/tcmbank-detail':()=>structuredSources.ingredientDetail(input.tcmbankId),
+        '/api/tcmbank-targets':()=>structuredSources.ingredientTargets(input.tcmbankId),
+        '/api/tcmbank-disease-targets':()=>structuredSources.diseaseTargets(input.disease),
         '/api/article':()=>structuredSources.article(input.pmid),
         '/api/structure-screen':()=>structureScreen.screen(input)
       };

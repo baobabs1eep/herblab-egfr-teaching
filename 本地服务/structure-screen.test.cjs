@@ -32,7 +32,7 @@ test('computes low and high fingerprint Tanimoto scores with fixed PubChem URLs'
   assert.equal(fingerprintTanimoto(ref, ref), 1);
 });
 
-test('keeps a candidate pending when identity or binding data is missing', async () => {
+test('keeps a candidate pending when PubChem identity is missing', async () => {
   const fingerprint = fp([1]);
   const fetchImpl = async url => {
     if (url.includes('/name/reference/')) return response(pubchem(10, 'REF', fingerprint));
@@ -43,22 +43,21 @@ test('keeps a candidate pending when identity or binding data is missing', async
   assert.equal(result.candidates.length, 2);
   assert.equal(result.candidates[0].structure.status, 'pending');
   assert.equal(result.candidates[1].structure.status, 'computed');
-  assert.equal(result.candidates[1].binding.status, 'unavailable');
+  assert.equal(result.candidates[1].tcmbank.status, 'unavailable');
 });
 
-test('does not infer efficacy from target mapping and preserves raw activity fields', async () => {
+test('does not infer efficacy from TCMBank target relationships', async () => {
   const fingerprint = fp([1]);
   const fetchImpl = async url => {
     if (url.includes('/name/reference/')) return response(pubchem(10, 'REF', fingerprint));
     if (url.includes('/name/candidate/')) return response(pubchem(11, 'KEY', fingerprint));
-    if (url.includes('/target.json')) return response({ targets: [{ target_chembl_id: 'CHEMBLT1', target_type: 'SINGLE PROTEIN', organism: 'Homo sapiens', target_components: [{ accession: 'P12345' }] }] });
-    if (url.includes('/molecule.json')) return response({ molecules: [{ molecule_chembl_id: 'CHEMBL1', molecule_structures: { standard_inchi_key: 'KEY' } }] });
-    return response({ activities: [{ standard_type: 'Ki', standard_relation: '=', standard_value: '4', standard_units: 'nM', assay_type: 'B', assay_chembl_id: 'CHEMBLA', document_chembl_id: 'CHEMBLD', potential_duplicate: true }], page_meta: { total_count: 1 } });
+    return response(pubchem(11, 'KEY', fingerprint));
   };
-  const result = await createStructureScreen({ fetchImpl }).screen({ names: ['candidate'], reference: 'reference', accession: 'P12345' });
-  assert.equal(result.candidates[0].binding.status, 'recorded');
-  assert.equal(result.candidates[0].binding.records[0].type, 'Ki');
-  assert.equal(result.candidates[0].binding.records[0].flags.potentialDuplicate, true);
+  const tcmbank={ingredient:async()=>({records:[{identifier:'TCMBANKIN000001',name:'candidate',targets:[{gene:'SCN9A',description:'relationship'}]}],total:1})};
+  const result = await createStructureScreen({ fetchImpl,tcmbank }).screen({ names: ['candidate'], reference: 'reference', accession: 'SCN9A' });
+  assert.equal(result.candidates[0].tcmbank.status, 'recorded');
+  assert.equal(result.candidates[0].tcmbank.targets[0].gene, 'SCN9A');
+  assert.equal(result.target.requested, 'SCN9A');
   assert.equal(result.candidates[0].efficacy, undefined);
 });
 
@@ -67,22 +66,18 @@ test('rejects malformed fingerprints', async () => {
   await assert.rejects(() => createStructureScreen({ fetchImpl }).screen({ names: ['candidate'], reference: 'reference' }), /malformed/);
 });
 
-test('target source failure cannot remove candidates or stop structure ranking',async()=>{
- const fingerprint=fp([1]);const service=createStructureScreen({fetchImpl:async url=>url.includes('/target.json')?response({},false,503):response(pubchem(1,'KEY',fingerprint))});
- const result=await service.screen({names:['candidate'],reference:'reference',accession:'P12345'});
- assert.equal(result.candidates[0].structure.score,100);assert.equal(result.candidates[0].binding.status,'pending');assert.equal(result.candidates[0].binding.total,null);
+test('TCMBank failure cannot remove candidates or stop structure ranking',async()=>{
+ const fingerprint=fp([1]);const service=createStructureScreen({fetchImpl:async()=>response(pubchem(1,'KEY',fingerprint)),tcmbank:{ingredient:async()=>{throw new Error('TCMBank unavailable')}}});
+ const result=await service.screen({names:['candidate'],reference:'reference',accession:'SCN9A'});
+ assert.equal(result.candidates[0].structure.score,100);assert.equal(result.candidates[0].tcmbank.status,'pending');assert.equal(result.candidates[0].tcmbank.total,null);
 });
 
-test('malformed activity response is pending, never a verified zero-hit result',async()=>{
- const fingerprint=fp([1]);const service=createStructureScreen({fetchImpl:async url=>{
-  if(url.includes('/target.json'))return response({targets:[{target_chembl_id:'CHEMBL1',target_type:'SINGLE PROTEIN',organism:'Homo sapiens',target_components:[{accession:'P12345'}]}]});
-  if(url.includes('/molecule.json'))return response({molecules:[{molecule_chembl_id:'CHEMBL2',molecule_structures:{standard_inchi_key:'KEY'}}]});
-  if(url.includes('/activity.json'))return response({unexpected:true});return response(pubchem(1,'KEY',fingerprint));
- }});
- const result=await service.screen({names:['candidate'],reference:'reference',accession:'P12345'});assert.equal(result.candidates[0].binding.status,'pending');assert.equal(result.candidates[0].binding.total,null);
+test('empty TCMBank relationship response is no_record, not verified target absence',async()=>{
+ const fingerprint=fp([1]);const service=createStructureScreen({fetchImpl:async()=>response(pubchem(1,'KEY',fingerprint)),tcmbank:{ingredient:async()=>({records:[],total:0})}});
+ const result=await service.screen({names:['candidate'],reference:'reference',accession:'SCN9A'});assert.equal(result.candidates[0].tcmbank.status,'no_record');assert.equal(result.candidates[0].tcmbank.targets.length,0);
 });
 
 test('query budget retains unprocessed candidates as pending instead of timing out whole batch',async()=>{
  let clock=0;const fingerprint=fp([1]);const service=createStructureScreen({now:()=>clock,batchBudgetMs:1000,fetchImpl:async()=>{clock+=1100;return response(pubchem(1,'KEY',fingerprint))}});
- const result=await service.screen({names:['candidate'],reference:'reference'});assert.equal(result.candidates.length,1);assert.equal(result.candidates[0].structure.status,'pending');assert.equal(result.candidates[0].binding.total,null);
+ const result=await service.screen({names:['candidate'],reference:'reference'});assert.equal(result.candidates.length,1);assert.equal(result.candidates[0].structure.status,'pending');assert.equal(result.candidates[0].tcmbank.total,null);
 });

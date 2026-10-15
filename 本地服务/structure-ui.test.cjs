@@ -2,9 +2,9 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 function boot(saved={},fetch=async()=>{throw new Error('unexpected fetch')}){const handlers={},memory=new Map([['herblab-structure-pool-v1',JSON.stringify(saved)]]);const c={localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},document:{addEventListener:(n,f)=>handlers[n]=f},URL,Blob,AbortSignal,fetch,setTimeout,window:null};c.window=c;c.render=()=>{};vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../演示前端/structure-ui.js'),'utf8'),c);return {c,handlers};}
 test('database-only pool imports without papers, but cannot invent complete matching',()=>{
- const {c}=boot({accession:'P00533',result:{reference:{cid:1},candidates:[{name:'unreported',identity:{sourceURL:'https://pubchem.ncbi.nlm.nih.gov/compound/2'},structure:{status:'computed',score:60,method:'Tanimoto',referenceCID:1},binding:{status:'pending',total:null,records:[]}}]}});
+ const {c}=boot({accession:'SCN9A',result:{reference:{cid:1},candidates:[{name:'unreported',identity:{sourceURL:'https://pubchem.ncbi.nlm.nih.gov/compound/2'},structure:{status:'computed',score:60,method:'Tanimoto',referenceCID:1},tcmbank:{status:'recorded',total:1,records:[{identifier:'TCMBANKIN000001'}],targets:[{gene:'SCN9A'}]}}]}});
  const pool=c.StructureUI.parsePool({provenance:{source:'HERB'},records:[{name:'unreported',smiles:'CC'}]});assert.equal(pool.length,1);assert.equal(pool[0].source,'HERB');
- const data=c.StructureUI.template();assert.equal(data.candidates[0].match.components.structure.value,60);assert.equal(data.candidates[0].match.components.affinity.value,null);assert.equal(data.candidates[0].match.components.channel.value,null);
+ const data=c.StructureUI.template();assert.equal(data.candidates[0].match.components.structure.value,60);assert.equal(data.candidates[0].match.components.channel.value,null);assert.equal(data.candidates[0].match.components.affinity.value,null);
  const result=require('../演示前端/ranking.js').compute(data);assert.equal(result.conventionalEligible,0);
  assert.match(c.StructureUI.panel(),/不要求已有疾病文献/);assert.doesNotMatch(c.StructureUI.panel(),/惊奇度/);
 });
@@ -15,5 +15,12 @@ test('imported mechanism dimensions remain visible without fabricated values',()
 });
 test('structure action submits only batch names reference and target, with no literature request',async()=>{
  const calls=[];const {handlers}=boot({names:'candidate',reference:'reference',accession:'P00533',pool:[{name:'extra'}]},async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return {ok:true,json:async()=>({reference:{cid:1},candidates:[]})}});
- await handlers.click({target:{closest:()=>({id:'structureRun'})}});assert.equal(calls.length,1);assert.equal(calls[0].url,'/api/structure-screen');assert.deepEqual(calls[0].body,{names:['candidate'],reference:'reference',accession:'P00533'});
+ await handlers.click({target:{closest:selector=>selector==='button'?{id:'structureRun'}:null}});assert.equal(calls.length,1);assert.equal(calls[0].url,'/api/structure-screen');assert.deepEqual(calls[0].body,{names:['candidate'],reference:'reference',accession:'P00533'});
+});
+test('a structure-first candidate and selected TCMBank target can enter validation',async()=>{
+ const candidate={name:'candidate',identity:{cid:123,smiles:'CC'},structure:{status:'computed',score:75},tcmbank:{records:[{identifier:'TCMBANKIN000001',name:'candidate'}],targets:[{gene:'SCN9A',description:'target relationship'}]}};
+ const {c,handlers}=boot({result:{candidates:[candidate],provenance:{queriedAt:'2026-10-15T00:00:00Z'}},selectedTargets:{candidate:{gene:'SCN9A'}}});let adopted=null;
+ c.HerbWorkspace={selectResearchCandidate:(item,snapshot)=>{adopted={item,snapshot}}};c.ResearchUI={currentDisease:()=>({label:'三叉神经痛',term:'trigeminal neuralgia'})};c.location={hash:''};
+ const button={dataset:{adoptStructure:'0'}};await handlers.click({target:{closest:selector=>selector==='button'||selector==='[data-adopt-structure]'?button:null}});
+ assert.equal(adopted.item.identifier,'TCMBANKIN000001');assert.equal(adopted.item.selectedTarget.gene,'SCN9A');assert.equal(adopted.snapshot.target,'SCN9A');assert.equal(c.location.hash,'experiment');
 });

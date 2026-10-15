@@ -11,7 +11,8 @@ function services(overrides = {}) {
     naturalProduct: async name => { calls.push(['coconut', name]); return { records: [{ identifier: 'COC-1', name }] }; },
   };
   const sources = {
-    molecule: async name => { calls.push(['chembl', name]); throw new Error('ChEMBL unavailable'); },
+    ingredient: async name => { calls.push(['tcmbank', name]); return { records: [{ identifier: 'TCMBANKIN000001', name, targets: [{ gene: 'EGFR', description: 'target' }] }] }; },
+    diseaseTargets: async disease => { calls.push(['disease-targets', disease]); return { records: [{ gene: 'EGFR', description: 'disease target' }] }; },
     target: async target => { calls.push(['target', target]); return { records: [{ accession: 'P00533', target }] }; },
   };
   return { research: { ...research, ...overrides.research }, sources: { ...sources, ...overrides.sources }, calls };
@@ -24,11 +25,13 @@ test('checks identity sources concurrently and keeps partial failures', async ()
     records: Array.from({ length: 5 }, (_, i) => ({ pmid: String(i), abstract: 'large' })),
     target: 'EGFR', disease: '肺癌', query: 'q', retrievedAt: '2026-10-09T00:00:00.000Z',
   });
-  assert.deepEqual(s.calls.map(x => x[0]).sort(), ['chembl', 'coconut', 'pubchem', 'target']);
+  assert.deepEqual(s.calls.map(x => x[0]).sort(), ['coconut', 'disease-targets', 'pubchem', 'target', 'tcmbank']);
   assert.equal(result.identity.pubchem.status, 'ok');
   assert.equal(result.identity.coconut.status, 'ok');
-  assert.equal(result.identity.chembl.status, 'error');
+  assert.equal(result.identity.tcmbank.status, 'ok');
   assert.equal(result.target.status, 'ok');
+  assert.equal(result.suggestedTargets[0].gene, 'EGFR');
+  assert.equal(result.suggestedTargets[0].evidence, '成分与疾病共同关联');
   assert.equal(result.provenance.records.length, 3);
   assert.equal(result.provenance.records[0].abstract, undefined);
   assert.equal(result.readiness.canRank, false);

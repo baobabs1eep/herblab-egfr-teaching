@@ -1,10 +1,8 @@
 'use strict';
 
 // PubChem PUG REST property endpoint: https://pubchem.ncbi.nlm.nih.gov/docs/pug-rest-tutorial
-// ChEMBL web services: https://chembl.github.io/using-new-chembl-web-services/
 
 const PUBCHEM = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound';
-const CHEMBL = 'https://www.ebi.ac.uk/chembl/api/data';
 const MAX_CACHE = 100;
 
 class StructureScreenError extends Error {
@@ -54,7 +52,7 @@ function fingerprintTanimoto(left, right) {
   return union === 0 ? 1 : intersection / union;
 }
 
-function createStructureScreen({ fetchImpl = global.fetch, timeoutMs = 8000, cacheTtlMs = 300000, batchBudgetMs = 75000, now = Date.now } = {}) {
+function createStructureScreen({ fetchImpl = global.fetch, timeoutMs = 8000, cacheTtlMs = 300000, batchBudgetMs = 75000, now = Date.now, tcmbank = null } = {}) {
   if (typeof fetchImpl !== 'function') throw new TypeError('fetchImpl is required');
   const timeout = Math.max(250, Math.min(8000, Number(timeoutMs) || 8000));
   const ttl = Math.max(0, Math.min(3600000, Number(cacheTtlMs) || 300000));
@@ -101,38 +99,18 @@ function createStructureScreen({ fetchImpl = global.fetch, timeoutMs = 8000, cac
     return { cid, inchiKey: String(p.InChIKey), smiles: String(p.ConnectivitySMILES), fingerprint: String(p.Fingerprint2D), sourceURL: url };
   }
 
-  async function resolveTarget(accession) {
-    if (!accession) return null;
-    const url = `${CHEMBL}/target.json?target_components__accession=${encodeURIComponent(accession)}&target_type=SINGLE%20PROTEIN&limit=5`;
-    const data = await cached(url);
-    if(!Array.isArray(data?.targets))throw new StructureScreenError('ChEMBL returned invalid target records',502);
-    const records = data.targets;
-    const valid = records.filter(t => {
-      const organism = typeof t.organism === 'object' ? t.organism.scientific_name || t.organism.name : t.organism;
-      const targetOrganism = t.target_organism || organism;
-      return String(t.target_type || '').toUpperCase() === 'SINGLE PROTEIN' && Array.isArray(t.target_components) && t.target_components.some(c => String(c.accession || '').toUpperCase() === accession.toUpperCase()) && String(targetOrganism || '').toLowerCase() === 'homo sapiens';
-    });
-    return valid.length === 1 && Number(data.page_meta?.total_count??records.length)<=records.length ? { id: String(valid[0].target_chembl_id), url } : { ambiguous: true, url };
-  }
-
-  async function binding(identity, target) {
-    if (!target) return { status: 'unavailable', records: [], total: null, truncated: false, warning: 'No UniProt accession was supplied.' };
-    if (target.ambiguous || target.error) return { status: 'pending', records: [], total: null, truncated: false, warning: target.error || 'Target mapping is ambiguous; no activity query was issued.' };
+  async function tcmbankProfile(name) {
+    if (!tcmbank || typeof tcmbank.ingredient !== 'function' || /^\d+$/.test(name)) return { status: 'unavailable', records: [], total: null, targets: [], warning: 'TCMBank 需要英文成分名称；当前记录待人工核对。' };
     try {
-      const moleculeURL = `${CHEMBL}/molecule.json?molecule_structures__standard_inchi_key=${encodeURIComponent(identity.inchiKey)}&limit=2`;
-      const molecules = await cached(moleculeURL);
-      if(!Array.isArray(molecules?.molecules))throw new StructureScreenError('ChEMBL returned invalid molecule records',502);
-      const rows = molecules.molecules.filter(m => String(m.molecule_structures?.standard_inchi_key || '').toUpperCase() === identity.inchiKey.toUpperCase());
-      if (rows.length !== 1 || !rows[0].molecule_chembl_id || Number(molecules.page_meta?.total_count??molecules.molecules.length)>molecules.molecules.length) return { status: 'pending', records: [], total: null, truncated: false, warning: 'ChEMBL molecule identity was not unique.' };
-      const moleculeId = String(rows[0].molecule_chembl_id);
-      const activityURL = `${CHEMBL}/activity.json?molecule_chembl_id=${encodeURIComponent(moleculeId)}&target_chembl_id=${encodeURIComponent(target.id)}&assay_type=B&limit=20`;
-      const data = await cached(activityURL);
-      if(!Array.isArray(data?.activities))throw new StructureScreenError('ChEMBL returned invalid activity records',502);
-      const activities = data.activities;
-      const records = activities.slice(0, 20).map(a => ({ type: a.standard_type ?? a.type ?? null, relation: a.standard_relation ?? a.relation ?? null, value: a.standard_value ?? a.value ?? null, units: a.standard_units ?? a.units ?? null, assay: { id: a.assay_chembl_id ?? null, type: a.assay_type ?? null, description: a.assay_description ?? null }, document: { id: a.document_chembl_id ?? null, doi: a.document_doi ?? null, pmid: a.document_pmid ?? null }, flags: { potentialDuplicate: Boolean(a.potential_duplicate), validity: a.data_validity_comment ?? null } }));
-      const total = Number(data?.page_meta?.total_count ?? records.length);
-      return { status: records.length ? 'recorded' : 'no_record', records, total, truncated: total > records.length, sourceURL:activityURL,moleculeSourceURL:moleculeURL,targetSourceURL:target.url, warning: records.length ? null : 'No binding record was returned; this does not imply lack of affinity.' };
-    } catch (error) { return { status: 'pending', records: [], total: null, truncated: false, warning: error.message }; }
+      const result = await tcmbank.ingredient(name);
+      const targets = [];
+      const seen = new Set();
+      for (const record of result.records || []) for (const target of record.targets || []) {
+        const gene = String(target.gene || '').toUpperCase();
+        if (gene && !seen.has(gene)) { seen.add(gene); targets.push({ ...target, gene, ingredientId: record.identifier, ingredientName: record.name }); }
+      }
+      return { status: result.records?.length ? 'recorded' : 'no_record', records: result.records || [], total: result.total, targets: targets.slice(0, 20), warning: result.records?.length ? null : 'TCMBank 未返回名称匹配记录；这不代表该成分不存在。' };
+    } catch (error) { return { status: 'pending', records: [], total: null, targets: [], warning: error.message }; }
   }
 
   async function screen(input = {}) {
@@ -140,28 +118,25 @@ function createStructureScreen({ fetchImpl = global.fetch, timeoutMs = 8000, cac
     if (!plain(input) || !Array.isArray(input.names) || input.names.length < 1 || input.names.length > 8) throw new StructureScreenError('names must contain 1 to 8 entries');
     const names = input.names.map((value, index) => asInput(value, `names[${index}]`));
     const referenceInput = asInput(input.reference, 'reference');
-    let accession = input.accession == null ? null : String(input.accession).trim();
-    if (accession && !/^[A-Za-z0-9]{6,12}$/.test(accession)) throw new StructureScreenError('accession is invalid');
+    let targetInput = input.accession == null ? null : String(input.accession).trim();
+    if (targetInput && !/^[A-Za-z0-9_-]{1,30}$/.test(targetInput)) throw new StructureScreenError('target is invalid');
     const reference = await pubchem(referenceInput);
-    let target;try{target=await resolveTarget(accession);}catch(error){target={error:error.message};}
     const candidates = [];
     const warnings = [];
     for (const name of names) {
       if(now()-startedAt>=budget){
-        candidates.push({name,identity:null,structure:{status:'pending',score:null,tanimoto:null,method:'Tanimoto',referenceCID:reference.cid},binding:{status:'pending',records:[],total:null,warning:'本批查询预算已用完，请单独重试此成分。'},warning:'本批查询预算已用完，请单独重试此成分。'});
+        candidates.push({name,identity:null,structure:{status:'pending',score:null,tanimoto:null,method:'Tanimoto',referenceCID:reference.cid},tcmbank:{status:'pending',records:[],targets:[],total:null,warning:'本批查询预算已用完，请单独重试此成分。'},warning:'本批查询预算已用完，请单独重试此成分。'});
         continue;
       }
       try {
         const identity = await pubchem(name);
         const tanimoto = fingerprintTanimoto(reference.fingerprint, identity.fingerprint);
-        candidates.push({ name, identity, structure: { status: 'computed', tanimoto, score: 100 * tanimoto, source: 'PubChem Fingerprint2D', method: 'Tanimoto', referenceCID: reference.cid }, binding: await binding(identity, target) });
+        candidates.push({ name, identity, structure: { status: 'computed', tanimoto, score: 100 * tanimoto, source: 'PubChem Fingerprint2D', method: 'Tanimoto', referenceCID: reference.cid }, tcmbank: await tcmbankProfile(name) });
       } catch (error) {
-        candidates.push({ name, identity: null, structure: { status: 'pending', tanimoto: null, score: null, source: 'PubChem Fingerprint2D', method: 'Tanimoto', referenceCID: reference.cid }, binding: { status: 'pending', records: [], total: null, truncated: false, warning: error.message }, warning: error.message });
+        candidates.push({ name, identity: null, structure: { status: 'pending', tanimoto: null, score: null, source: 'PubChem Fingerprint2D', method: 'Tanimoto', referenceCID: reference.cid }, tcmbank: await tcmbankProfile(name), warning: error.message });
       }
     }
-    if (target?.ambiguous) warnings.push('ChEMBL target mapping was ambiguous.');
-    if(target?.error)warnings.push(target.error);
-    return { schemaVersion: 1, target: { accession: accession || null }, reference, candidates, provenance: { queriedAt: new Date().toISOString(), warnings } };
+    return { schemaVersion: 1, target: { requested: targetInput || null }, reference, candidates, provenance: { queriedAt: new Date().toISOString(), warnings } };
   }
 
   return { screen };
