@@ -16,7 +16,7 @@ const response=(data,status=200)=>({ok:status<400,status,json:async()=>data});
 
 test('research chain defaults to trigeminal neuralgia, keeps the start page focused, and gates adoption',async()=>{
   const calls=[];const f=async(url,options)=>{calls.push({url,options});return String(url).includes('/api/research')?response({researchId:'r1',disease:{label:'三叉神经痛'},scope:'all',records:[],candidates:[{name:'A',identifier:'machine-id',pmids:[]}] }):response({})};
-  const {context,listeners}=boot(f); const start=context.ResearchUI.taskPanel();assert.match(start,/三叉神经痛/);assert.match(start,/疾病全部文献/);assert.doesNotMatch(start,/独立成分候选池|肺癌|EGFR/);
+  const {context,listeners}=boot(f); const start=context.ResearchUI.taskPanel();assert.match(start,/三叉神经痛/);assert.match(start,/治疗、通路、靶点与适应症文献/);assert.match(start,/treatment、pathway、target、indication/);assert.doesNotMatch(start,/独立成分候选池|肺癌|EGFR/);
   listeners.click({target:{closest:s=>s==='#researchSearchV2'?{}:null}});await new Promise(r=>setImmediate(r));const body=JSON.parse(calls[0].options.body);assert.equal(body.scope,'all');assert.equal(body.limit,20);assert.equal(body.offset,0);assert.equal(body.sort,'date');
   context.ResearchUI.evidencePanel(); assert.equal(context.adopted,undefined);
 });

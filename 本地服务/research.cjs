@@ -4,6 +4,8 @@ const PUBMED = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
 const PUBCHEM = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/';
 const PUBTATOR = 'https://www.ncbi.nlm.nih.gov/research/pubtator3-api/publications/export/biocjson?pmids=';
 const EUROPEPMC = 'https://www.ebi.ac.uk/europepmc/webservices/rest/search';
+const PUBMED_RESEARCH_FOCUS = '("treatment"[Title/Abstract] OR "pathway"[Title/Abstract] OR "target"[Title/Abstract] OR "indication"[Title/Abstract])';
+const EPMC_RESEARCH_FOCUS = '(TITLE_ABS:treatment OR TITLE_ABS:pathway OR TITLE_ABS:target OR TITLE_ABS:indication)';
 const ALIASES = new Map([
   ['三叉神经痛', ['Trigeminal neuralgia', 'trigeminal neuralgia']], ['trigeminal neuralgia', ['Trigeminal neuralgia', 'trigeminal neuralgia']],
   ['高血压', ['高血压', 'hypertension']], ['原发性高血压', ['原发性高血压', 'primary hypertension']], ['hypertension', ['Hypertension', 'hypertension']], ['primary hypertension', ['Primary hypertension', 'primary hypertension']],
@@ -73,7 +75,7 @@ function createResearchService(options = {}) {
     const toYear = Number.isInteger(Number(input.toYear)) && Number(input.toYear) >= 1800 && Number(input.toYear) <= currentYear ? Number(input.toYear) : null;
     if (fromYear && toYear && fromYear > toYear) throw new ResearchError('起始年份不能晚于结束年份。', 400);
     const scope = input.scope === 'all' ? 'all' : 'natural-products';
-    const query = [`("${disease.term}"[Title/Abstract])`]; if (scope !== 'all' && !compound) query.push('("natural product" OR herbal OR flavonoid OR phytochemical OR "plant extract" OR "traditional Chinese medicine")[Title/Abstract]'); if (target) query.push(`("${target}"[Title/Abstract])`); if (compound) query.push(`("${compound}"[Title/Abstract])`); const queryText = query.join(' AND ');
+    const query = [`("${disease.term}"[Title/Abstract])`, PUBMED_RESEARCH_FOCUS]; if (scope !== 'all' && !compound) query.push('("natural product" OR herbal OR flavonoid OR phytochemical OR "plant extract" OR "traditional Chinese medicine")[Title/Abstract]'); if (target) query.push(`("${target}"[Title/Abstract])`); if (compound) query.push(`("${compound}"[Title/Abstract])`); const queryText = query.join(' AND ');
     const key = JSON.stringify([disease.term, target, compound, scope, limit, offset, sort, fromYear, toYear]); const old = cache.get(key); if (old && old.expires > Date.now()) return { ...old.value, cached: true }; if (inflight.has(key)) return inflight.get(key);
     const work = (async () => { const warnings = []; const base = { disease, scope, query: queryText, total: 0, offset, nextOffset: offset + limit, pageSize: limit, sort, fromYear, toYear, hasMore: false, retrievedAt: new Date().toISOString(), records: [], candidates: [], warnings, source: 'PubMed', cached: false };
       let es; let ids; try {
@@ -83,7 +85,7 @@ function createResearchService(options = {}) {
         ids = es.esearchresult.idlist.map(String); base.total = Number(es.esearchresult.count); base.hasMore = offset + ids.length < base.total;
       } catch (primaryError) {
         const dateQuery = fromYear || toYear ? ` AND FIRST_PDATE:[${fromYear || 1800}-01-01 TO ${toYear || currentYear}-12-31]` : '';
-        const epmcQuery = `SRC:MED AND TITLE_ABS:"${disease.term}"${target ? ` AND TITLE_ABS:"${target}"` : ''}${compound ? ` AND TITLE_ABS:"${compound}"` : scope === 'all' ? '' : ' AND (TITLE_ABS:"natural product" OR TITLE_ABS:herbal OR TITLE_ABS:flavonoid OR TITLE_ABS:phytochemical OR TITLE_ABS:"plant extract" OR TITLE_ABS:"traditional Chinese medicine")'}${dateQuery}${sort === 'date' ? ' sort_date:y' : ''}`;
+        const epmcQuery = `SRC:MED AND TITLE_ABS:"${disease.term}" AND ${EPMC_RESEARCH_FOCUS}${target ? ` AND TITLE_ABS:"${target}"` : ''}${compound ? ` AND TITLE_ABS:"${compound}"` : scope === 'all' ? '' : ' AND (TITLE_ABS:"natural product" OR TITLE_ABS:herbal OR TITLE_ABS:flavonoid OR TITLE_ABS:phytochemical OR TITLE_ABS:"plant extract" OR TITLE_ABS:"traditional Chinese medicine")'}${dateQuery}${sort === 'date' ? ' sort_date:y' : ''}`;
         let epmc;
         try { epmc = await bodyJson(`${EUROPEPMC}?query=${encodeURIComponent(epmcQuery)}&resultType=core&format=json&pageSize=${limit}&page=${Math.floor(offset / limit) + 1}`); }
         catch (fallbackError) {
