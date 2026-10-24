@@ -30,3 +30,25 @@ test('disease target suggestion marks fuzzy disease matching for review', async 
   assert.equal(result.records[0].gene, 'SCN9A');
   assert.match(result.warnings[0], /模糊匹配/);
 });
+
+test('gene reverse lookup returns all associated ingredient records', async () => {
+  const fetchImpl = async url => {
+    assert.match(String(url), /gene\/toingredients/);
+    assert.match(String(url), /TCMBANKGE000001/);
+    return response({status:true,data:[{TCMBank_ID:'TCMBANKIN000001',Ingredient_id:'HBIN1',name:'Compound A',Reference:'123'}]});
+  };
+  const result = await createTCMBankService({fetchImpl,minIntervalMs:1,sleep:async()=>{}}).ingredientsForGene('TCMBANKGE000001');
+  assert.equal(result.records[0].name, 'Compound A');
+  assert.equal(result.records[0].identifier, 'TCMBANKIN000001');
+});
+
+test('ingredient herb lookup returns explicit TCMBank herb relationships', async () => {
+  const fetchImpl = async url => {
+    assert.match(String(url), /ingredient\/toherbs/);
+    return response({status:true,data:[{Herb_ID:'TCMBANKHE000001',TCM_name:'黄芩',TCM_name_en:'Baical Skullcap Root',Reference:'R1'}]});
+  };
+  const result = await createTCMBankService({fetchImpl,minIntervalMs:1,sleep:async()=>{}}).herbsForIngredient('TCMBANKIN000001');
+  assert.equal(result.records[0].identifier,'TCMBANKHE000001');
+  assert.equal(result.records[0].name,'黄芩');
+  assert.equal(result.total,1);
+});

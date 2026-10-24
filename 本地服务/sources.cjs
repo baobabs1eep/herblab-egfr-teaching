@@ -15,8 +15,11 @@ function createSourceService(options={}){
  async function ingredient(name){return tcmbank.searchIngredient(name);}
  async function ingredientDetail(id){return tcmbank.ingredientDetail(id);}
  async function ingredientTargets(id){return tcmbank.targetsForIngredient(id);}
+ async function ingredientHerbs(id){return tcmbank.herbsForIngredient(id);}
  async function diseaseTargets(name){return tcmbank.diseaseTargets(name);}
+ async function gene(name){return tcmbank.searchGene(name);}
+ async function geneIngredients(id){return tcmbank.ingredientsForGene(id);}
  async function article(pmid){const id=clean(pmid,'pmid',20);if(!/^\d{1,12}$/.test(id))throw new SourceError('pmid must be numeric',400);return cached(`article:${id}`,async()=>{const query=`EXT_ID:${id} AND SRC:MED`,d=(await request(`${EPMC}?query=${encodeURIComponent(query)}&resultType=core&format=json&pageSize=1`)).data;if(!d?.resultList||!Array.isArray(d.resultList.result)||!Number.isFinite(Number(d.hitCount)))throw new SourceError('Europe PMC returned invalid JSON',502);const x=d.resultList.result[0];if(!x||String(x.pmid||x.id||'')!==id)throw new SourceError('Article not found',404);const pmcid=String(x.pmcid||'');const urls=Array.isArray(x.fullTextUrlList?.fullTextUrl)?x.fullTextUrlList.fullTextUrl.map(z=>({url:String(z.url||''),availability:z.availability||null})).filter(z=>/^https:\/\//.test(z.url)):[];const record={pmid:id,title:String(x.title||''),journal:String(x.journalInfo?.journal?.title||x.journalTitle||''),date:String(x.firstPublicationDate||''),doi:String(x.doi||''),abstract:String(x.abstractText||'').replace(/<[^>]+>/g,'').trim(),pmcid:pmcid||null,openAccess:x.isOpenAccess===true||x.isOpenAccess==='Y',links:{pubmed:`https://pubmed.ncbi.nlm.nih.gov/${id}/`,europePmc:`https://europepmc.org/article/MED/${id}`,pmc:pmcid?`https://europepmc.org/articles/${encodeURIComponent(pmcid)}/`:null,fullText:urls}};return envelope('Europe PMC',[record],1,[],{query,cached:false});});}
- return {target,ingredient,ingredientDetail,ingredientTargets,diseaseTargets,article,SourceError};
+ return {target,ingredient,ingredientDetail,ingredientTargets,ingredientHerbs,diseaseTargets,gene,geneIngredients,article,SourceError};
 }
 module.exports={createSourceService,SourceError};

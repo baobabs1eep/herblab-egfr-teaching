@@ -10,6 +10,7 @@ const {createCandidateChecker} = require('./candidate-check.cjs');
 const {validateResearchImport, loadTeachingCase} = require('./literature-import.cjs');
 const structuredSources = createSourceService();
 const structureScreen = require('./structure-screen.cjs').createStructureScreen({tcmbank:structuredSources});
+const modeTwo = require('./mode-two.cjs').createModeTwoService({sources: structuredSources});
 const researchSessions = new Map();
 let researchActive = 0;
 const config = {};
@@ -74,7 +75,7 @@ const publicHost = config.PUBLIC_HOST || '';
 const root = path.resolve(__dirname, '../演示前端');
 const teachingCasePath = path.join(root, 'data', 'trigeminal-neuralgia-teaching.json');
 const assets = new Map([['/', ['index.html','text/html']], ['/index.html',['index.html','text/html']], ['/app.js',['app.js','text/javascript']], ['/style.css',['style.css','text/css']], ['/lucide.min.js',['lucide.min.js','text/javascript']], ['/quercetin.png',['quercetin.png','image/png']]]);
-for (const file of ['ranking.js','ranking-data.js','ranking-ui.js','research-ui.js','sources-ui.js','structure-ui.js']) assets.set('/'+file,[file,'text/javascript']);
+for (const file of ['ranking.js','ranking-data.js','ranking-ui.js','research-ui.js','sources-ui.js','structure-ui.js','mode-two-ui.js']) assets.set('/'+file,[file,'text/javascript']);
 assets.set('/ranking.css',['ranking.css','text/css']);
 assets.set('/research.css',['research.css','text/css']);
 let active = 0;
@@ -97,7 +98,7 @@ function registerResearchSession(data) {
   for (const [key, value] of researchSessions) if (now - value.savedAt > 3600000) researchSessions.delete(key);
   while (researchSessions.size >= 100) researchSessions.delete(researchSessions.keys().next().value);
   const researchId = randomUUID();
-  researchSessions.set(researchId, {savedAt: now, data});
+  researchSessions.set(researchId, {savedAt: now, data, modeTwoGroups: new Map(), modeTwoDiseaseTargets: null});
   return researchId;
 }
 function mergeResearchPage(existing, page) {
@@ -142,7 +143,7 @@ const server = http.createServer(async (req, res) => {
     {name:'HERB',status:'manual',description:'官方网页查阅；尚未取得并导入获准使用的数据导出文件。',url:'http://herb.ac.cn/v2/'},
     {name:'TCMSP',status:'manual',description:'官方网页查阅；未发现公开接口，尚未导入授权导出数据。',url:'https://old.tcmsp-e.com/tcmsp.php'}
   ]});
-  if (req.method === 'POST' && ['/api/research','/api/research-import','/api/compound','/api/natural-product','/api/target','/api/tcmbank-ingredient','/api/tcmbank-detail','/api/tcmbank-targets','/api/tcmbank-disease-targets','/api/article','/api/candidate-check','/api/structure-screen'].includes(route)) {
+  if (req.method === 'POST' && ['/api/research','/api/research-import','/api/compound','/api/natural-product','/api/target','/api/tcmbank-ingredient','/api/tcmbank-detail','/api/tcmbank-targets','/api/tcmbank-disease-targets','/api/article','/api/candidate-check','/api/structure-screen','/api/mode-two-group'].includes(route)) {
     const expected = publicMode || proxyMode ? publicOrigin : `http://${req.headers.host}`;
     if (req.headers.origin && req.headers.origin!==expected) return json(res,403,{error:'请从研学页面发起检索。'});
     if (!(req.headers['content-type']||'').startsWith('application/json')) return json(res,415,{error:'请求格式应为 JSON。'});
@@ -160,6 +161,28 @@ const server = http.createServer(async (req, res) => {
         if (!Number.isInteger(i)||i<0||i>=saved.data.candidates.length) return json(res,400,{error:'请选择本轮已有的候选线索。'});
         const data=saved.data,candidate=data.candidates[i];
         return json(res,200,await candidateChecker.check({candidate,records:data.records.filter(r=>(candidate.pmids||[]).includes(r.pmid)),target:data.target,disease:data.disease,query:data.query,retrievedAt:data.retrievedAt}));
+      }
+      if (route === '/api/mode-two-group') {
+        const saved = typeof input.research_id === 'string' && researchSessions.get(input.research_id);
+        if (!saved || Date.now() - saved.savedAt > 3600000) return json(res, 409, {error: '本轮检索记录已过期，请重新检索后生成模式二。'});
+        const candidateIndex = input.candidate_index;
+        if (!Number.isInteger(candidateIndex) || candidateIndex < 0 || candidateIndex >= (saved.data.candidates || []).length) return json(res, 400, {error: '候选序号无效。'});
+        const offset = Number.isInteger(input.offset) && input.offset >= 0 ? input.offset : 0;
+        const pageSize = Number.isInteger(input.page_size) ? Math.max(1, Math.min(100, input.page_size)) : 50;
+        if (!saved.modeTwoGroups) saved.modeTwoGroups = new Map();
+        let group = saved.modeTwoGroups.get(candidateIndex);
+        if (!group) {
+          if (!saved.modeTwoDiseaseTargets) {
+            const diseaseName = saved.data.disease?.term || saved.data.disease?.label || '';
+            saved.modeTwoDiseaseTargets = diseaseName ? structuredSources.diseaseTargets(diseaseName).catch(() => ({records: []})) : Promise.resolve({records: []});
+          }
+          const diseaseTargets = await saved.modeTwoDiseaseTargets;
+          group = await modeTwo.buildGroup(saved.data.candidates[candidateIndex], {diseaseTargets: diseaseTargets.records || []});
+          saved.modeTwoGroups.set(candidateIndex, group);
+        }
+        saved.savedAt = Date.now();
+        if (group.status !== 'ready') return json(res, 200, {...group, candidateIndex, members: [], offset: 0, pageSize, hasMore: false});
+        return json(res, 200, {...group, candidateIndex, members: group.members.slice(offset, offset + pageSize), offset, pageSize, hasMore: offset + pageSize < group.members.length});
       }
       if (route === '/api/research-import') {
         const imported = validateResearchImport(input);
@@ -190,7 +213,7 @@ const server = http.createServer(async (req, res) => {
           const sameOptions=['target','compound','sort','fromYear','toYear'].every(key=>String(searchInput[key]||'')===String(input[key]||''));
           if (!sameDisease||!sameScope||!sameOptions) return json(res,409,{error:'加载更多的检索条件与本轮研究不一致，请重新开始研究。'});
           const merged=mergeResearchPage(saved.data,{...result,target:input.target||saved.data.target||''});
-          researchSessions.set(requestedId,{savedAt:Date.now(),data:merged});
+          researchSessions.set(requestedId,{savedAt:Date.now(),data:merged,modeTwoGroups:new Map(),modeTwoDiseaseTargets:null});
           return json(res,200,{...merged,researchId:requestedId});
         }
         const stored={...result,target:input.target||'',loaded:result.records?.length||0,searchInput:{target:input.target||'',compound:input.compound||'',sort:input.sort||'date',fromYear:input.fromYear||'',toYear:input.toYear||''}};

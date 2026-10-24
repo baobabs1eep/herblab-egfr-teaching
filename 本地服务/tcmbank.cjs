@@ -124,6 +124,25 @@ function createTCMBankService(options = {}) {
     });
   }
 
+  async function herbsForIngredient(id) {
+    const tcmbankId = cleanId(id, 'TCMBANKIN');
+    return cached(`ingredient-herbs:${tcmbankId}`, async () => {
+      const response = await request('ingredient/toherbs', { tcmbank_id: tcmbankId });
+      const rows = Array.isArray(response.data) ? response.data : [];
+      const records = rows.map(row => ({
+        identifier: String(row.Herb_ID || row.TCMBank_ID || ''),
+        name: String(row.TCM_name || ''),
+        englishName: String(row.TCM_name_en || ''),
+        pinyinName: String(row.TCM_name2 || ''),
+        therapeuticClass: String(row.Therapeutic_cn_class || ''),
+        function: String(row.Function || ''),
+        reference: String(row.Reference || ''),
+        source: 'TCMBank',
+      })).filter(row => row.identifier || row.name || row.englishName || row.pinyinName);
+      return {source: 'TCMBank', retrievedAt: new Date().toISOString(), records, total: rows.length, tcmbankId, cached: false};
+    });
+  }
+
   async function searchIngredient(name) {
     const query = cleanText(name, 'name');
     return cached(`ingredient:${query.toLowerCase()}`, async () => {
@@ -201,7 +220,43 @@ function createTCMBankService(options = {}) {
     });
   }
 
-  return { searchIngredient, ingredientDetail, targetsForIngredient, diseaseTargets, TCMBankError };
+  async function searchGene(name) {
+    const query = cleanText(name, 'gene', 80);
+    return cached(`gene:${query.toLowerCase()}`, async () => {
+      const response = await request('gene/search', { gene_name: query, cur_page: 1, per_page: 20 });
+      const block = response.data && typeof response.data === 'object' ? response.data : {};
+      const rows = Array.isArray(block.list) ? block.list : [];
+      const records = rows.map(row => ({
+        identifier: String(row.TCMBank_ID || ''),
+        targetId: String(row.Target_id || ''),
+        gene: String(row.Gene_name || row.gene_name || ''),
+        aliases: String(row.Gene_alias || ''),
+        description: String(row.Description || ''),
+        source: 'TCMBank',
+      })).filter(row => row.identifier && row.gene);
+      return {source: 'TCMBank', retrievedAt: new Date().toISOString(), records, total: Number(block.total_genes ?? rows.length), query, cached: false};
+    });
+  }
+
+  async function ingredientsForGene(id) {
+    const tcmbankId = cleanId(id, 'TCMBANKGE');
+    return cached(`gene-ingredients:${tcmbankId}`, async () => {
+      const response = await request('gene/toingredients', { tcmbank_id: tcmbankId });
+      const rows = Array.isArray(response.data) ? response.data : [];
+      const records = rows.map(row => ({
+        identifier: String(row.TCMBank_ID || row.Ingredient_id || ''),
+        name: String(row.Ingredient_name || row.name || ''),
+        aliases: String(row.Ingredient_alias || row.Alias || ''),
+        formula: String(row.Molecular_Formula || ''),
+        reference: String(row.Reference || ''),
+        source: 'TCMBank',
+        targetId: tcmbankId,
+      })).filter(row => row.identifier || row.name);
+      return {source: 'TCMBank', retrievedAt: new Date().toISOString(), records, total: rows.length, tcmbankId, cached: false};
+    });
+  }
+
+  return { searchIngredient, ingredientDetail, targetsForIngredient, herbsForIngredient, diseaseTargets, searchGene, ingredientsForGene, TCMBankError };
 }
 
 module.exports = { createTCMBankService, TCMBankError };

@@ -8,6 +8,7 @@ deploy.env
 公网部署/herblab-release.tar.gz
 **/vendor/
 **/__pycache__/
+node_modules/
 *.pyc
 *.exe
 *.dll

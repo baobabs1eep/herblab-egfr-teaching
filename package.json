@@ -1,0 +1,14 @@
+{
+  "name": "qizhen-herblab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "启真问智中药单体研学助手",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node 本地服务/server.cjs",
+    "test": "node --test --test-isolation=none 本地服务/*.test.cjs"
+  },
+  "dependencies": {
+    "@rdkit/rdkit": "2026.9.1"
+  }
+}
