@@ -5,6 +5,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const {randomUUID} = crypto;
 const {createResearchService} = require('./research.cjs');
+const {sortByJournalImpact} = require('./journal-metrics.cjs');
 const {createSourceService} = require('./sources.cjs');
 const {createCandidateChecker} = require('./candidate-check.cjs');
 const {validateResearchImport, loadTeachingCase} = require('./literature-import.cjs');
@@ -111,7 +112,9 @@ function mergeResearchPage(existing, page) {
     if (!old) candidates.set(key, {...item, pmids:[...(item.pmids || [])], excerpts:[...(item.excerpts || [])]});
     else candidates.set(key, {...old, ...item, pmids:[...new Set([...(old.pmids || []), ...(item.pmids || [])])], excerpts:[...new Set([...(old.excerpts || []), ...(item.excerpts || [])])].slice(0, 8)});
   }
-  return {...existing, ...page, records:[...records.values()], candidates:[...candidates.values()].slice(0, 50), warnings:[...new Set([...(existing.warnings || []), ...(page.warnings || [])])], offset:0, loaded:[...records.values()].length, hasMore:[...records.values()].length < Number(page.total || existing.total || 0)};
+  const mergedRecords = page.sort === 'impact' ? sortByJournalImpact([...records.values()]) : [...records.values()];
+  const matched = mergedRecords.filter(record=>record.journalMetric).length;
+  return {...existing, ...page, records:mergedRecords, journalMetrics:{...(existing.journalMetrics||{}),...(page.journalMetrics||{}),matched,unmatched:mergedRecords.length-matched}, candidates:[...candidates.values()].slice(0, 50), warnings:[...new Set([...(existing.warnings || []), ...(page.warnings || [])])], offset:0, loaded:mergedRecords.length, hasMore:mergedRecords.length < Number(page.total || existing.total || 0)};
 }
 function json(res, status, data) { res.writeHead(status, {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}); res.end(JSON.stringify(data)); }
 async function body(req) {
@@ -136,6 +139,7 @@ const server = http.createServer(async (req, res) => {
     {name:'Europe PMC',status:'fallback',description:'NCBI 不可用时检索 Europe PMC 的 PubMed 记录，保留实际查询来源。',url:'https://europepmc.org/RestfulWebService'},
     {name:'PubMed',status:'live_with_fallback',description:'按疾病、靶点和成分检索文献；检索命中需阅读原文核验。',url:'https://pubmed.ncbi.nlm.nih.gov/'},
     {name:'PubTator3',status:'upstream_dependent',description:'识别检索文献中的化学实体；机器识别尚需核对身份、用途及相关性。',url:'https://www.ncbi.nlm.nih.gov/research/pubtator3/'},
+    {name:'本地期刊指标表',status:'local',description:'用于匹配 2025 JIF 并整理已获取文献；期刊级指标不代表单篇论文证据质量。',url:''},
     {name:'PubChem',status:'upstream_dependent',description:'按分子名称查询 CID、分子式、分子量与 InChIKey。',url:'https://pubchem.ncbi.nlm.nih.gov/'},
     {name:'COCONUT',status:'live',description:'天然产物名称与结构查询；并非所有记录均为中药成分。',url:'https://coconut.naturalproducts.net/'},
     {name:'UniProt',status:'live',description:'查询人工审阅的人类靶点记录；基因名匹配需要确认，不推断疾病关联。',url:'https://www.uniprot.org/'},

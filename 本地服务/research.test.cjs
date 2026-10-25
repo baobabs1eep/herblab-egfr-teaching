@@ -1,5 +1,6 @@
 'use strict';
 const test = require('node:test'); const assert = require('node:assert/strict'); const { createResearchService, ResearchError } = require('./research.cjs');
+const {createJournalMetricIndex} = require('./journal-metrics.cjs');
 test('NCBI abuse redirect is reported and successful fallback remains usable', async () => {
   let parsedBlock=false;
   const blocked={ok:true,status:200,url:'https://misuse.ncbi.nlm.nih.gov/error/abuse.shtml',json:async()=>{parsedBlock=true;throw new Error('HTML');}};
@@ -15,6 +16,25 @@ test('unknown Chinese disease uses configured normalizer', async () => { const s
 test('primary hypertension is available without AI normalization', async () => { let normalized=false; const s=createResearchService({fetchImpl:mockFetch([['esearch',{esearchresult:{count:'0',idlist:[]}}]]),minIntervalMs:0,resolveDisease:async()=>{normalized=true;return 'wrong';}}); const r=await s.search({disease:'原发性高血压'}); assert.equal(r.disease.term,'primary hypertension'); assert.equal(normalized,false); });
 test('broad scope applies research-focus terms, omits natural-product terms, and allows up to fifty records', async () => { const calls=[]; const s=createResearchService({fetchImpl:mockFetch([['esearch',{esearchresult:{count:'0',idlist:[]}}]],calls),minIntervalMs:0}); const r=await s.search({disease:'三叉神经痛',scope:'all',limit:99}); const url=decodeURIComponent(calls[0]); assert.equal(r.scope,'all'); assert.match(url,/retmax=50/); assert.match(url,/treatment.*pathway.*target.*indication/); assert.doesNotMatch(url,/natural product|flavonoid|phytochemical/); });
 test('pagination, date range, and sort are passed to literature providers', async () => { const calls=[]; const s=createResearchService({fetchImpl:mockFetch([['esearch',{esearchresult:{count:'65',idlist:['21','22']}}],['esummary',{result:{'21':{title:'A'},'22':{title:'B'}}}],['efetch','<x/>'],['pubtator',{documents:[]}]],calls),minIntervalMs:0}); const r=await s.search({disease:'三叉神经痛',scope:'all',limit:20,offset:20,sort:'relevance',fromYear:2020,toYear:2026}); const url=decodeURIComponent(calls[0]); assert.match(url,/retstart=20/); assert.match(url,/sort=relevance/); assert.match(url,/mindate=2020\/01\/01/); assert.match(url,/maxdate=2026\/12\/31/); assert.equal(r.offset,20); assert.equal(r.hasMore,true); });
+test('impact mode defaults to ten years, matches ISSN, and sorts JIF descending', async () => {
+  const calls=[];
+  const journalMetrics=createJournalMetricIndex({meta:{source:'测试期刊表',jifYear:2025,releaseYear:2026},records:[
+    {name:'Low Journal',issns:['1111-1111'],jif:2.1,jifYear:2025},
+    {name:'High Journal',issns:['2222-2222'],jif:9.4,jifYear:2025}
+  ]});
+  const fetchImpl=mockFetch([
+    ['esearch',{esearchresult:{count:'2',idlist:['1','2']}}],
+    ['esummary',{result:{'1':{title:'Low',fulljournalname:'Low Journal',issn:'1111-1111',pubdate:'2026'},'2':{title:'High',fulljournalname:'High Journal',issn:'2222-2222',pubdate:'2025'}}}],
+    ['efetch','<x/>'],['pubtator',{documents:[]}]
+  ],calls);
+  const result=await createResearchService({fetchImpl,minIntervalMs:0,journalMetrics}).search({disease:'inflammation',sort:'impact'});
+  const query=decodeURIComponent(calls[0]),year=new Date().getUTCFullYear();
+  assert.match(query,new RegExp(`mindate=${year-9}\\/01\\/01`));
+  assert.match(query,new RegExp(`maxdate=${year}\\/12\\/31`));
+  assert.deepEqual(result.records.map(x=>x.pmid),['2','1']);
+  assert.equal(result.records[0].journalMetric.matchedBy,'ISSN');
+  assert.equal(result.journalMetrics.matched,2);
+});
 test('PubTator array and object forms produce bounded chemical candidates', async () => { const bio=[{id:'7',passages:[{text:'Aspirin study',annotations:[{text:'Aspirin',infons:{type:'Chemical',identifier:'CID:2244'}}]}]}]; const f=mockFetch([['esearch',{esearchresult:{count:'1',idlist:['7']}}],['esummary',{result:{'7':{title:'T',source:'J'}}}],['efetch','<x/>'],['pubtator',{PubTator3:bio}]]); const r=await createResearchService({fetchImpl:f,minIntervalMs:0}).search({disease:'inflammation'}); assert.equal(r.candidates[0].identifier,'CID:2244'); assert.equal(r.candidates[0].status,'机器识别·待核验'); });
 test('zero hits differ from upstream failure', async () => { const zero=await createResearchService({fetchImpl:mockFetch([['esearch',{esearchresult:{count:'0',idlist:[]}}]]),minIntervalMs:0}).search({disease:'lung cancer'}); assert.equal(zero.total,0); assert.deepEqual(zero.records,[]); const fail=async()=>({ok:false,status:503,json:async()=>({})}); await assert.rejects(()=>createResearchService({fetchImpl:fail,minIntervalMs:0}).search({disease:'lung cancer'}), e=>e.status===502); });
 test('blocked or malformed PubMed falls back to Europe PMC with the same focus constraint and indexes chemicals', async () => { const calls=[]; const f=async url => { calls.push(String(url)); if (String(url).includes('/esearch.fcgi')) return {ok:true,status:200,json:async()=>{throw new Error('HTML block page')}}; return {ok:true,status:200,json:async()=>({hitCount:1,resultList:{result:[{id:'41880679',pmid:'41880679',source:'MED',title:'Study',journalInfo:{journal:{title:'Journal'}},firstPublicationDate:'2024-01-01',doi:'10.x',abstractText:'<p>Abstract</p>',chemicalList:{chemical:[{name:'liquiritin',registryNumber:'T0O79T74CD'},{name:'generic protein',registryNumber:'0'}]}}]}})}; }; const r=await createResearchService({fetchImpl:f,minIntervalMs:0}).search({disease:'inflammation'}); assert.equal(r.source,'Europe PMC（PubMed记录）'); assert.equal(r.provider,'Europe PMC'); assert.match(r.query,/SRC:MED/); assert.match(r.query,/TITLE_ABS:treatment.*TITLE_ABS:pathway.*TITLE_ABS:target.*TITLE_ABS:indication/); assert.match(r.query,/sort_date:y/); assert.equal(r.records[0].pmid,'41880679'); assert.equal(r.records[0].abstract,'Abstract'); assert.equal(r.candidates[0].identifier,'T0O79T74CD'); assert.equal(r.candidates[0].source,'Europe PMC化学索引'); assert.match(r.warnings[0],/PubMed 不可用/); assert.ok(calls.some(x=>x.includes('europepmc'))); });

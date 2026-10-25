@@ -1,5 +1,7 @@
 'use strict';
 
+const {defaultJournalMetrics, sortByJournalImpact} = require('./journal-metrics.cjs');
+
 const PUBMED = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
 const PUBCHEM = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/';
 const PUBTATOR = 'https://www.ncbi.nlm.nih.gov/research/pubtator3-api/publications/export/biocjson?pmids=';
@@ -37,10 +39,11 @@ function diseaseInput(value) {
 function decodeXml(s) { return s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/&(#x?[0-9a-f]+|amp|lt|gt|quot|apos);/gi, (_, x) => { const m = x.toLowerCase(); if (m === 'amp') return '&'; if (m === 'lt') return '<'; if (m === 'gt') return '>'; if (m === 'quot') return '"'; if (m === 'apos') return "'"; const n = m[0] === '#' ? (m[1] === 'x' ? parseInt(m.slice(2), 16) : parseInt(m.slice(1), 10)) : NaN; return Number.isFinite(n) ? String.fromCodePoint(n) : _; }); }
 function tag(xml, name) { const m = xml.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`, 'i')); return m ? decodeXml(m[1].replace(/<[^>]+>/g, '').trim()) : ''; }
 function between(xml, name) { const m = xml.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`, 'i')); return m ? m[1] : ''; }
-function esummary(json, pmid) { const d = json?.result?.[pmid] || {}; const article = { pmid, title: d.title || '', journal: d.fulljournalname || d.source || '', date: d.pubdate || '', doi: '', url: `https://pubmed.ncbi.nlm.nih.gov/${encodeURIComponent(pmid)}/`, abstract: '' }; for (const x of (d.articleids || [])) if (String(x.idtype).toLowerCase() === 'doi') article.doi = x.value || ''; return article; }
+function esummary(json, pmid) { const d = json?.result?.[pmid] || {}; const article = { pmid, title: d.title || '', journal: d.fulljournalname || d.source || '', issn: d.issn || '', eissn: d.essn || '', date: d.pubdate || '', doi: '', url: `https://pubmed.ncbi.nlm.nih.gov/${encodeURIComponent(pmid)}/`, abstract: '' }; for (const x of (d.articleids || [])) if (String(x.idtype).toLowerCase() === 'doi') article.doi = x.value || ''; return article; }
 
 function createResearchService(options = {}) {
   const fetchImpl = options.fetchImpl || global.fetch;
+  const journalMetrics = options.journalMetrics || defaultJournalMetrics;
   const timeoutMs = options.timeoutMs || 12000, minIntervalMs = options.minIntervalMs == null ? 500 : options.minIntervalMs;
   const cache = new Map(), inflight = new Map(); let lastRequest = 0, queue = Promise.resolve();
   async function pacedFetch(url, init = {}) {
@@ -56,6 +59,18 @@ function createResearchService(options = {}) {
   }
   async function bodyJson(url, init) { const r = await pacedFetch(url, init); checkAccess(r); try { return await r.json(); } catch { throw new ResearchError('上游返回格式无效，请稍后重试。'); } }
   async function bodyText(url) { const r = await pacedFetch(url); checkAccess(r); return r.text(); }
+  function finalizeLiterature(base) {
+    let records = journalMetrics.enrich(base.records || []);
+    if (base.sort === 'impact') records = sortByJournalImpact(records);
+    const matched = records.filter(record => record.journalMetric).length;
+    return {...base, records, journalMetrics:{
+      source: journalMetrics.meta?.source || '本地期刊指标表',
+      jifYear: Number(journalMetrics.meta?.jifYear) || null,
+      releaseYear: Number(journalMetrics.meta?.releaseYear) || null,
+      matched,
+      unmatched: records.length - matched
+    }};
+  }
   async function search(input = {}) {
     let disease = diseaseInput(input.disease);
     if (disease.needsResolution) {
@@ -69,10 +84,10 @@ function createResearchService(options = {}) {
     const target = normalizeInput(input.target, 'target', 100), compound = normalizeInput(input.compound, 'compound', 120);
     const limit = Math.max(1, Math.min(50, Number.isFinite(Number(input.limit)) ? Number(input.limit) : 20));
     const offset = Math.max(0, Math.min(1000, Number.isFinite(Number(input.offset)) ? Math.floor(Number(input.offset)) : 0));
-    const sort = input.sort === 'relevance' ? 'relevance' : 'date';
+    const sort = input.sort === 'relevance' ? 'relevance' : input.sort === 'impact' ? 'impact' : 'date';
     const currentYear = new Date().getUTCFullYear();
-    const fromYear = Number.isInteger(Number(input.fromYear)) && Number(input.fromYear) >= 1800 && Number(input.fromYear) <= currentYear ? Number(input.fromYear) : null;
-    const toYear = Number.isInteger(Number(input.toYear)) && Number(input.toYear) >= 1800 && Number(input.toYear) <= currentYear ? Number(input.toYear) : null;
+    const fromYear = Number.isInteger(Number(input.fromYear)) && Number(input.fromYear) >= 1800 && Number(input.fromYear) <= currentYear ? Number(input.fromYear) : sort === 'impact' ? currentYear - 9 : null;
+    const toYear = Number.isInteger(Number(input.toYear)) && Number(input.toYear) >= 1800 && Number(input.toYear) <= currentYear ? Number(input.toYear) : sort === 'impact' ? currentYear : null;
     if (fromYear && toYear && fromYear > toYear) throw new ResearchError('起始年份不能晚于结束年份。', 400);
     const scope = input.scope === 'all' ? 'all' : 'natural-products';
     const query = [`("${disease.term}"[Title/Abstract])`, PUBMED_RESEARCH_FOCUS]; if (scope !== 'all' && !compound) query.push('("natural product" OR herbal OR flavonoid OR phytochemical OR "plant extract" OR "traditional Chinese medicine")[Title/Abstract]'); if (target) query.push(`("${target}"[Title/Abstract])`); if (compound) query.push(`("${compound}"[Title/Abstract])`); const queryText = query.join(' AND ');
@@ -95,15 +110,15 @@ function createResearchService(options = {}) {
         base.source = 'Europe PMC（PubMed记录）'; base.provider = 'Europe PMC'; base.query = epmcQuery; base.total = Number(epmc.hitCount); base.warnings.push(`PubMed 不可用，已切换 Europe PMC：${primaryError.message}`);
         const rows = epmc.resultList.result;
         base.hasMore = offset + rows.length < base.total;
-        base.records = rows.slice(0, limit).map(x => { const pmid = String(x.pmid || x.id || ''); const clean = value => decodeXml(String(value || '').replace(/<[^>]+>/g, '').trim()); const abstract = clean(x.abstractText).slice(0, 1500); return { pmid, title: clean(x.title), journal: x.journalInfo?.journal?.title || x.journalTitle || '', date: x.firstPublicationDate || '', doi: x.doi || '', url: pmid ? `https://pubmed.ncbi.nlm.nih.gov/${encodeURIComponent(pmid)}/` : '', abstract }; }).filter(x => x.pmid);
+        base.records = rows.slice(0, limit).map(x => { const pmid = String(x.pmid || x.id || ''); const clean = value => decodeXml(String(value || '').replace(/<[^>]+>/g, '').trim()); const abstract = clean(x.abstractText).slice(0, 1500); return { pmid, title: clean(x.title), journal: x.journalInfo?.journal?.title || x.journalTitle || '', issn:x.journalInfo?.journal?.issn || x.issn || '', eissn:x.journalInfo?.journal?.essn || x.essn || '', date: x.firstPublicationDate || '', doi: x.doi || '', url: pmid ? `https://pubmed.ncbi.nlm.nih.gov/${encodeURIComponent(pmid)}/` : '', abstract }; }).filter(x => x.pmid);
         const found = new Map(); for (const row of rows) for (const c of (row.chemicalList?.chemical || [])) { const identifier = String(c.registryNumber || '').trim(); if (!identifier || identifier === '0') continue; const name = String(c.name || '').trim(); if (!name) continue; const key = `${name.toLowerCase()}|${identifier}`; const item = found.get(key) || { name, identifier, pmids: [], excerpts: [], status: '文献索引·待核验', source: 'Europe PMC化学索引' }; if (row.pmid && !item.pmids.includes(String(row.pmid))) item.pmids.push(String(row.pmid)); found.set(key, item); }
-        base.candidates = [...found.values()].slice(0, 20); return base;
+        base.candidates = [...found.values()].slice(0, 20); return finalizeLiterature(base);
       }
-      if (!ids.length) return base;
+      if (!ids.length) return finalizeLiterature(base);
       let sum; try { sum = await bodyJson(`${PUBMED}esummary.fcgi?tool=herblab&db=pubmed&retmode=json&id=${ids.map(encodeURIComponent).join(',')}`); } catch (e) { warnings.push(`文献题录暂不可用：${e.message}`); sum={}; }
-      base.records = ids.map(id => esummary(sum, id)); try { const xml = await bodyText(`${PUBMED}efetch.fcgi?tool=herblab&db=pubmed&retmode=xml&id=${ids.map(encodeURIComponent).join(',')}`); const arts = [...xml.matchAll(/<PubmedArticle>([\s\S]*?)<\/PubmedArticle>/gi)]; for (const a of arts) { const pmid = tag(a[1], 'PMID'); const hit = base.records.find(x => x.pmid === pmid); if (hit) hit.abstract = [...a[1].matchAll(/<AbstractText(?:[^>]*)>([\s\S]*?)<\/AbstractText>/gi)].map(x => decodeXml(x[1].replace(/<[^>]+>/g, '').trim())).join('\n').slice(0, 1500); } if (base.records.some(x => x.abstract)) warnings.push('摘要摘录来自 PubMed，部分摘要受版权保护；请保留出处并到原文核验。'); } catch (e) { warnings.push(`文献摘要暂不可用：${e.message}`); }
+      base.records = ids.map(id => esummary(sum, id)); try { const xml = await bodyText(`${PUBMED}efetch.fcgi?tool=herblab&db=pubmed&retmode=xml&id=${ids.map(encodeURIComponent).join(',')}`); const arts = [...xml.matchAll(/<PubmedArticle>([\s\S]*?)<\/PubmedArticle>/gi)]; for (const a of arts) { const pmid = tag(a[1], 'PMID'); const hit = base.records.find(x => x.pmid === pmid); if (hit) { hit.abstract = [...a[1].matchAll(/<AbstractText(?:[^>]*)>([\s\S]*?)<\/AbstractText>/gi)].map(x => decodeXml(x[1].replace(/<[^>]+>/g, '').trim())).join('\n').slice(0, 1500); const issns=[...a[1].matchAll(/<ISSN(?:[^>]*)>([\s\S]*?)<\/ISSN>/gi)].map(x=>decodeXml(x[1].replace(/<[^>]+>/g,'').trim())).filter(Boolean); hit.issns=[...new Set([hit.issn,hit.eissn,...issns].filter(Boolean))]; } } if (base.records.some(x => x.abstract)) warnings.push('摘要摘录来自 PubMed，部分摘要受版权保护；请保留出处并到原文核验。'); } catch (e) { warnings.push(`文献摘要暂不可用：${e.message}`); }
       try { const bio = await bodyJson(`${PUBTATOR}${ids.map(encodeURIComponent).join(',')}`); const docs = Array.isArray(bio) ? bio : (bio?.PubTator3 || bio?.documents || []); if (!Array.isArray(docs)) throw new ResearchError('化学实体注释格式异常。'); if (docs.length<ids.length) warnings.push('部分论文暂未提供 PubTator3 化学实体注释，不能据此判断没有相关成分。'); const found = new Map(); for (const doc of docs) { const pmid = String(doc?.id || doc?.infons?.pmid || ''); for (const passage of (doc?.passages || [])) { const text = String(passage?.text || ''); for (const ann of (passage?.annotations || [])) { const inf = ann?.infons || {}; if (String(inf.type || '').toLowerCase() !== 'chemical') continue; const name = String(inf.name || ann.text || '').trim(); if (!name) continue; const identifier = String(inf.identifier || inf.cui || '').trim(); const key = identifier&&identifier!=='-' ? identifier : name.toLowerCase(); const item = found.get(key) || { name, identifier, pmids: [], excerpts: [], status: '机器识别·待核验', source: 'PubTator3' }; if (pmid && !item.pmids.includes(pmid)) item.pmids.push(pmid); const excerpt = text.slice(0, 250); if (excerpt && !item.excerpts.includes(excerpt)) item.excerpts.push(excerpt); found.set(key, item); } } } base.candidates = [...found.values()].slice(0, 20); } catch (e) { warnings.push(`化学实体识别暂不可用：${e.message}`); }
-      return base;
+      return finalizeLiterature(base);
     })(); inflight.set(key, work); try { const result = await work; cache.set(key, { value: result, expires: Date.now() + 3600000 }); while (cache.size > 100) cache.delete(cache.keys().next().value); return result; } finally { inflight.delete(key); }
   }
   async function compound(name) { const n = normalizeInput(name, 'compound', 120); if (!n) throw new ResearchError('compound is required', 400); const url = `${PUBCHEM}${encodeURIComponent(n)}/property/MolecularFormula,MolecularWeight,InChIKey,IUPACName/JSON`; const data = await bodyJson(url); const p = data?.PropertyTable?.Properties?.[0]; if (!p || p.CID == null) throw new ResearchError('未找到分子身份，请核对英文名或同义词。', 404); return { name: n, cid: Number(p.CID), formula: p.MolecularFormula || '', molecularWeight: p.MolecularWeight ?? null, inchiKey: p.InChIKey || '', iupacName: p.IUPACName || '', url: `https://pubchem.ncbi.nlm.nih.gov/compound/${encodeURIComponent(p.CID)}`, retrievedAt: new Date().toISOString(), source: 'PubChem', identityStatus: 'needs_review' }; }
